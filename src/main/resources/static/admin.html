@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quản trị - CoWorking Cafe</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/sidebar.css">
+  <link rel="stylesheet" href="/css/topbar.css">
+  <link rel="stylesheet" href="/css/cards.css">
+  <link rel="stylesheet" href="/css/table.css">
+  <link rel="stylesheet" href="/css/forms.css">
+  <link rel="stylesheet" href="/css/modal.css">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+
+<body>
+
+  <!-- ===== SIDEBAR ===== -->
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <i class="fa-solid fa-mug-hot"></i> CW Cafe
+    </div>
+
+    <div class="menu-item active" data-section="dashboard">
+      <i class="fa-solid fa-chart-pie"></i> Tổng quan
+    </div>
+    <div class="menu-item" data-section="checkin">
+      <i class="fa-solid fa-clock-rotate-left"></i> Check-in / Out
+    </div>
+    <div class="menu-item" data-section="customers">
+      <i class="fa-solid fa-users"></i> Khách hàng
+    </div>
+    <div class="menu-item" data-section="services">
+      <i class="fa-solid fa-concierge-bell"></i> Dịch vụ
+    </div>
+    <div class="menu-item" data-section="packages">
+      <i class="fa-solid fa-ticket"></i> Gói giờ
+    </div>
+    <div class="menu-item" data-section="orders">
+      <i class="fa-solid fa-bell"></i> Yêu cầu <span id="pendingOrderCount" class="badge badge-danger"
+        style="margin-left:8px;display:none">0</span>
+    </div>
+    <div class="menu-item" data-section="reports">
+      <i class="fa-solid fa-file-invoice-dollar"></i> Báo cáo
+    </div>
+
+    <div class="menu-divider"></div>
+    <div class="menu-item logout-btn" onclick="logout()">
+      <i class="fa-solid fa-arrow-right-from-bracket"></i> Đăng xuất
+    </div>
+  </div>
+
+  <!-- ===== MAIN ===== -->
+  <div class="main">
+
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <h1 id="pageTitle">Tổng quan hệ thống</h1>
+      <div class="topbar-right">
+        <div class="admin-info">
+          <i class="fa-solid fa-circle-user"></i>
+          <span id="adminName">Admin</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== SECTION: DASHBOARD ========== -->
+    <section id="section-dashboard" class="section active">
+      <!-- Stat cards -->
+      <div class="cards">
+        <div class="card">
+          <div class="card-header">
+            <h3>Đang ở quán</h3>
+            <div class="card-icon"><i class="fa-solid fa-user-check"></i></div>
+          </div>
+          <div class="card-value" id="statCheckin">—</div>
+          <div class="card-sub">khách đang hoạt động</div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h3>Tổng khách hàng</h3>
+            <div class="card-icon"><i class="fa-solid fa-users"></i></div>
+          </div>
+          <div class="card-value" id="statTotalUsers">—</div>
+          <div class="card-sub">người dùng</div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h3>Doanh thu hôm nay</h3>
+            <div class="card-icon"><i class="fa-solid fa-wallet"></i></div>
+          </div>
+          <div class="card-value" id="statRevenue">—</div>
+          <div class="card-sub">tổng giao dịch</div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h3>Yêu cầu hôm nay</h3>
+            <div class="card-icon"><i class="fa-solid fa-bell-concierge"></i></div>
+          </div>
+          <div class="card-value" id="statServices">—</div>
+          <div class="card-sub">đã order</div>
+        </div>
+      </div>
+
+      <!-- Bottom grid -->
+      <div class="dashboard-bottom">
+        <!-- Active sessions -->
+        <div class="table-container">
+          <div class="table-header">
+            <h3>Danh sách khách đang hoạt động <span class="badge badge-active" id="activeSessionCount">0</span></h3>
+          </div>
+          <div id="activeSessionListDashboard">
+            <div class="empty-state"><i class="fa-solid fa-laptop"></i>
+              <p>Không có tải...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent customers -->
+        <div class="table-container">
+          <div class="table-header">
+            <h3>Yêu cầu chờ xử lý</h3>
+          </div>
+          <div id="dashboardCustomerTbody">
+            <div class="empty-state"><i class="fa-solid fa-bell"></i>
+              <p>Đang tải...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== SECTION: CHECK-IN ========== -->
+    <section id="section-checkin" class="section">
+      <div class="checkin-layout">
+        <!-- Search -->
+        <div>
+          <div class="table-container">
+            <h3 style="margin-bottom:16px;font-size:16px;font-weight:600">Check-in cho khách (Tìm SĐT)</h3>
+            <div style="display:flex;gap:10px;margin-bottom:20px">
+              <div class="search-box" style="flex:1">
+                <i class="fa-solid fa-phone"></i>
+                <input type="text" id="checkinPhone" placeholder="Nhập số điện thoại..." style="width:100%" />
+              </div>
+              <button class="btn-primary" id="btnSearchCheckin" style="white-space:nowrap">
+                <i class="fa-solid fa-magnifying-glass"></i> Tìm kiếm
+              </button>
+            </div>
+            <div id="checkinResult">
+              <div class="empty-state">
+                <i class="fa-solid fa-user-clock"></i>
+                <p>Nhập số điện thoại để check-in cho khách</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active sessions -->
+        <div class="table-container">
+          <div class="table-header" style="margin-bottom:0">
+            <h3>Phiên đang hoạt động <button class="btn-secondary btn-sm" onclick="loadCheckinSection()"
+                style="margin-left:auto"><i class="fa-solid fa-rotate"></i></button></h3>
+          </div>
+          <div id="activeSessionsContainer" style="margin-top:16px">
+            <div class="empty-state"><i class="fa-solid fa-laptop"></i>
+              <p>Không có phiên nào</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== SECTION: CUSTOMERS ========== -->
+    <section id="section-customers" class="section">
+      <div class="table-container">
+        <div class="table-header">
+          <h3>Danh sách khách hàng <span class="text-muted text-sm" id="customerCount"></span></h3>
+          <div class="table-actions" style="display:flex; gap:12px; align-items:center;">
+            <div class="search-box">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" id="searchInputCustomer" placeholder="Tìm theo tên tr/sđt..."
+                oninput="filterCustomerList()" />
+            </div>
+            <button class="btn-primary" onclick="openCustomerModal()">
+              <i class="fa-solid fa-plus"></i> Thêm khách hàng
+            </button>
+          </div>
+
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Khách hàng</th>
+              <th>Số điện thoại</th>
+              <th>Giờ còn lại</th>
+              <th>Ngày tạo</th>
+              <th style="width: 40px;">Trạng thái</th>
+              <th style="text-align: center;">Hành động</th>
+            </tr>
+          </thead>
+          <tbody id="customerTbody">
+            <tr>
+              <td colspan="7" style="text-align:center;padding:20px">Đang tải...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ========== SECTION: SERVICES ========== -->
+    <section id="section-services" class="section">
+      <div class="services-layout">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+          <h3 style="font-size: 18px; font-weight: 600;">Danh sách Đồ Ăn / Món Uống</h3>
+          <div style="display:flex;align-items:center;gap:12px">
+            <span class="text-muted text-sm" id="serviceCount"></span>
+            <button class="btn-primary" onclick="openServiceModal()">
+              <i class="fa-solid fa-plus"></i> Thêm món mới
+            </button>
+          </div>
+        </div>
+        <div class="services-grid" id="servicesGrid">
+          <div class="empty-state" style="grid-column:1/-1"><i class="fa-solid fa-spinner fa-spin"></i>
+            <p>Đang tải...</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== SECTION: PACKAGES ========== -->
+    <section id="section-packages" class="section">
+      <div class="packages-layout">
+        <!-- Packages list -->
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+            <h3 style="font-size:18px;font-weight:600">Danh sách các Gói giờ Nổi bật</h3>
+            <button class="btn-primary" onclick="openPackageModal()">
+              <i class="fa-solid fa-plus"></i> Thêm gói mới
+            </button>
+          </div>
+          <div class="packages-grid" id="packagesGrid"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== SECTION: ORDERS ========== -->
+    <section id="section-orders" class="section">
+      <div class="orders-layout">
+        <!-- Header -->
+        <div class="orders-header">
+          <div>
+            <h2 class="orders-title"><i class="fa-solid fa-bell"></i> Quản lý Yêu cầu (Dịch vụ & Gói giờ)</h2>
+            <p class="orders-subtitle" id="orderCount">Đang tải...</p>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="orders-tab-bar" style="margin-top:10px; margin-bottom:10px;">
+          <button class="orders-tab-btn active" onclick="filterOrderList('ALL', this)">
+            Tất cả <span class="orders-tab-count" id="orderCountAll">0</span>
+          </button>
+          <button class="orders-tab-btn" onclick="filterOrderList('PENDING', this)">
+            Chờ duyệt <span class="orders-tab-count badge-warning" id="orderCountPending">0</span>
+          </button>
+          <button class="orders-tab-btn" onclick="filterOrderList('PAID', this)">
+            Đã thanh toán <span class="orders-tab-count badge-success" id="orderCountPaid">0</span>
+          </button>
+          <button class="orders-tab-btn" onclick="filterOrderList('CANCELLED', this)">
+            Đã hủy <span class="orders-tab-count badge-danger" id="orderCountCancel">0</span>
+          </button>
+        </div>
+
+        <!-- Cards grid -->
+        <div class="orders-grid" id="ordersGrid">
+          <div class="orders-empty">
+            <i class="fa-solid fa-spinner fa-spin"></i>
+            <p>Đang tải...</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== SECTION: REPORTS ========== -->
+    <section id="section-reports" class="section">
+      <div class="reports-layout">
+        <div class="reports-filter-bar">
+          <label for="reportMonthFilter" style="font-weight:600;color:var(--text-main)">Tháng báo cáo</label>
+          <input type="month" id="reportMonthFilter" />
+          <span id="reportMonthLabel" class="text-muted"></span>
+        </div>
+
+        <!-- Summary cards -->
+        <div class="cards">
+          <div class="card">
+            <div class="card-header">
+              <h3>Doanh thu tháng</h3>
+              <div class="card-icon"><i class="fa-solid fa-sack-dollar"></i></div>
+            </div>
+            <div class="card-value" id="reportTotalRevenue">—</div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h3>Tổng số giao dịch</h3>
+              <div class="card-icon"><i class="fa-solid fa-laptop"></i></div>
+            </div>
+            <div class="card-value" id="reportTotalTransactions">—</div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h3>Số ngày có doanh thu</h3>
+              <div class="card-icon"><i class="fa-solid fa-calendar-day"></i></div>
+            </div>
+            <div class="card-value" id="reportActiveDays">—</div>
+          </div>
+        </div>
+
+        <!-- Detail table -->
+        <div class="table-container">
+          <div class="table-header">
+            <h3>Báo cáo doanh thu theo ngày</h3>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Ngày</th>
+                <th>Tổng doanh thu</th>
+                <th>Số giao dịch</th>
+                <th>Dịch vụ</th>
+                <th>Gói giờ</th>
+                <th>Có những gì</th>
+              </tr>
+            </thead>
+            <tbody id="reportTbody">
+              <tr>
+                <td colspan="6" style="text-align:center;padding:20px">Đang tải...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="table-container">
+          <div class="table-header">
+            <h3 id="reportDetailTitle">Chi tiết giao dịch theo ngày</h3>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Thời gian</th>
+                <th>Khách hàng</th>
+                <th>Nội dung</th>
+                <th>Loại</th>
+                <th>Phương thức</th>
+                <th>Số tiền</th>
+              </tr>
+            </thead>
+            <tbody id="reportDetailTbody">
+              <tr>
+                <td colspan="6" style="text-align:center;padding:20px">Chọn một ngày để xem chi tiết</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- end .main -->
+
+  <!-- ========== MODALS ========== -->
+
+  <!-- Customer Modal -->
+  <div class="modal-overlay hidden" id="customerModalOverlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="customerModalTitle">Thêm khách hàng mới</h3>
+        <button class="modal-close" onclick="closeModal('customerModalOverlay')"><i
+            class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="customerEditId" />
+        <div class="input-group">
+          <label>Họ và tên *</label>
+          <input type="text" id="customerName" placeholder="Nguyễn Văn A" />
+        </div>
+        <div class="input-group">
+          <label>Số điện thoại *</label>
+          <input type="tel" id="customerPhone" placeholder="0987654321" />
+        </div>
+        <div class="input-group">
+          <label>Mật khẩu khởi tạo *</label>
+          <input type="text" id="customerPassword" placeholder="Nhập mật khẩu (mặc định: 123456)" value="123456" />
+        </div>
+        <div class="input-group" id="customerStatusGroup">
+          <label>Trạng thái tài khoản</label>
+          <select id="customerStatus">
+            <option value="ACTIVE">Hoạt động</option>
+            <option value="UNACTIVE">Khóa tài khoản</option>
+          </select>
+        </div>
+        <div class="modal-footer" style="padding:0;border:none;margin-top:10px">
+          <button type="button" class="btn-secondary" onclick="closeModal('customerModalOverlay')">Hủy</button>
+          <button type="button" class="btn-primary" onclick="saveCustomer()"><i class="fa-solid fa-check"></i>
+            Lưu</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Service Modal (Add/Edit Menu) -->
+  <div class="modal-overlay hidden" id="serviceModalOverlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="serviceModalTitle">Thêm Dịch vụ / Món mới</h3>
+        <button class="modal-close" onclick="closeModal('serviceModalOverlay')"><i
+            class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="serviceEditId" />
+        <div class="input-group">
+          <label>Tên món / dịch vụ *</label>
+          <input type="text" id="serviceName" placeholder="Cà phê sữa đá" />
+        </div>
+        <div class="input-group">
+          <label>Thể loại *</label>
+          <select id="serviceType">
+            <option value="DRINK">Đồ uống (Drink)</option>
+            <option value="FOOD">Đồ ăn (Food)</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label>Giá (VNĐ) *</label>
+          <input type="number" id="servicePrice" placeholder="25000" min="0" />
+        </div>
+        <div class="modal-footer" style="padding:0;border:none;margin-top:12px">
+          <button type="button" class="btn-secondary" onclick="closeModal('serviceModalOverlay')">Hủy</button>
+          <button type="button" class="btn-primary" onclick="saveService()"><i class="fa-solid fa-check"></i>
+            Lưu</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Package Modal -->
+  <div class="modal-overlay hidden" id="packageModalOverlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="packageModalTitle">Thêm Gói Giờ Mới</h3>
+        <button class="modal-close" onclick="closeModal('packageModalOverlay')"><i
+            class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="packageEditId" />
+        <div class="input-group">
+          <label>Tên gói *</label>
+          <input type="text" id="packageName" placeholder="Gói Sinh Viên" />
+        </div>
+        <div class="input-group">
+          <label>Số giờ *</label>
+          <input type="number" id="packageHours" placeholder="5" min="1" />
+        </div>
+        <div class="input-group">
+          <label>Giá (VNĐ) *</label>
+          <input type="number" id="packagePrice" placeholder="50000" min="0" />
+        </div>
+        <div class="modal-footer" style="padding:0;border:none;margin-top:12px">
+          <button type="button" class="btn-secondary" onclick="closeModal('packageModalOverlay')">Hủy</button>
+          <button type="button" class="btn-primary" onclick="savePackage()"><i class="fa-solid fa-check"></i>
+            Lưu</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Nạp Giờ -->
+  <div class="modal-overlay hidden" id="addHoursModalOverlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Nạp Giờ Nhanh</h3>
+        <button class="modal-close" onclick="closeModal('addHoursModalOverlay')"><i
+            class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="addHoursCustomerId" />
+        <div class="input-group">
+          <label>Khách hàng</label>
+          <div id="addHoursCustomerName" style="font-weight:700; font-size:16px; color:var(--primary-color);"></div>
+        </div>
+        <div class="input-group" style="margin-top:14px;">
+          <label>Số giờ cần nạp *</label>
+          <input type="number" id="addHoursValue" placeholder="VD: 5, 10..." min="0.5" step="0.5" />
+        </div>
+        <div class="modal-footer" style="padding:0;border:none;margin-top:16px">
+          <button type="button" class="btn-secondary" onclick="closeModal('addHoursModalOverlay')">Hủy</button>
+          <button type="button" class="btn-primary" onclick="submitAddHours()"><i class="fa-solid fa-bolt"></i> Nạp
+            Ngay</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/js/admin.js"></script>
+</body>
+
+</html>
