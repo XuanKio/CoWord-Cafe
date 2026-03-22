@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CoWorking Cafe - Trang khách hàng</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="/css/variables.css" />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/forms.css" />
+  <link rel="stylesheet" href="/css/user-page.css" />
+</head>
+
+<body>
+
+  <!-- ===== TOP BAR ===== -->
+  <header class="user-topbar">
+    <div class="user-topbar-logo">
+      <i class="fa-solid fa-mug-hot"></i>
+      <span>CoWorking Cafe</span>
+    </div>
+    <div class="user-topbar-actions">
+      <span class="open-badge">
+        <i class="fa-solid fa-circle-dot" style="color:#22c55e"></i> Đang mở cửa
+      </span>
+      <button id="btnLogout" class="btn-outline" style="display:none">
+        <i class="fa-solid fa-sign-out-alt"></i> Đăng xuất
+      </button>
+    </div>
+  </header>
+
+  <main class="user-container">
+
+    <div id="dashboardSection" style="display:none">
+
+      <!-- Lời chào -->
+      <div class="welcome-banner">
+        <div class="welcome-icon"><i class="fa-solid fa-mug-saucer"></i></div>
+        <div>
+          <h2>Xin chào, <span id="welcomeName">—</span>!</h2>
+          <p>Chào mừng bạn đến với CoWorking Cafe</p>
+        </div>
+      </div>
+
+      <!-- Thông tin tài khoản -->
+      <div class="user-card" style="margin-bottom:20px">
+        <div class="section-header" style="margin-bottom:12px">
+          <h3><i class="fa-solid fa-id-card"></i> Thông tin tài khoản</h3>
+        </div>
+        <div id="userInfoPanel">
+          <div style="color:var(--text-muted)"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</div>
+        </div>
+      </div>
+
+      <div class="dashboard-grid">
+
+        <!-- Cột trái: Lịch sử phiên -->
+        <section class="user-card">
+          <div class="section-header">
+            <h3><i class="fa-solid fa-calendar-check"></i> Lịch sử phiên</h3>
+          </div>
+          <div id="myBookingsList" class="bookings-list"></div>
+        </section>
+
+        <!-- Cột phải: Đặt hàng (gói + dịch vụ chung) -->
+        <section class="user-card">
+          <div class="section-header">
+            <h3><i class="fa-solid fa-basket-shopping"></i> Đặt hàng</h3>
+          </div>
+          <div id="orderPanel">
+            <div style="color:var(--text-muted)"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</div>
+          </div>
+        </section>
+
+      </div><!-- end dashboard-grid -->
+
+    </div><!-- end dashboardSection -->
+
+  </main>
+
+
+  <!-- Role Guard: ch\u1ec9 USER m\u1edbi \u0111\u01b0\u1ee3c v\u00e0o trang n\u00e0y -->
+  <script>
+    (function () {
+      var u = JSON.parse(localStorage.getItem('user') || '{}');
+      if (u.role !== 'USER' || !u.token) {
+        localStorage.removeItem('user');
+        window.location.href = '/login.html';
+      }
+    })();
+  </script>
+  <script type="module" src="/js/user-page.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CoWorking Cafe - Đăng nhập</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(180deg, #2E1E16 0%, #1a0f0a 100%);
+    }
+
+    .login-container {
+      background: #F9F6F0;
+      padding: 50px 45px;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+      width: 100%;
+      max-width: 420px;
+      text-align: center;
+    }
+
+    .logo {
+      margin-bottom: 40px;
+    }
+
+    .logo-icon {
+      width: 85px;
+      height: 85px;
+      background: linear-gradient(135deg, #4A3022 0%, #2E1E16 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      box-shadow: 0 8px 25px rgba(74, 48, 34, 0.3);
+    }
+
+    .logo-icon i {
+      font-size: 38px;
+      color: #D4A373;
+    }
+
+    .logo h1 {
+      color: #4A3022;
+      font-size: 26px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .logo p {
+      color: #777;
+      font-size: 14px;
+    }
+
+    .form-group {
+      margin-bottom: 22px;
+      text-align: left;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      color: #4A3022;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .input-wrapper {
+      position: relative;
+    }
+
+    .input-wrapper i {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #D4A373;
+      font-size: 16px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 14px 16px 14px 48px;
+      border: 2px solid #e2e8f0;
+      border-radius: 10px;
+      font-size: 15px;
+      transition: all 0.3s;
+      background: #ffffff;
+      color: #333;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #D4A373;
+      background: white;
+      box-shadow: 0 0 0 4px rgba(212, 163, 115, 0.15);
+    }
+
+    .form-group input::placeholder {
+      color: #aaa;
+    }
+
+    .btn-login {
+      width: 100%;
+      padding: 15px;
+      background: linear-gradient(135deg, #4A3022 0%, #2E1E16 100%);
+      color: #ffffff;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .btn-login:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(74, 48, 34, 0.3);
+    }
+
+    .btn-login:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .error-message {
+      background: #fee2e2;
+      color: #991b1b;
+      padding: 12px 16px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      text-align: left;
+    }
+
+    .error-message.show {
+      display: flex;
+    }
+
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .footer {
+      margin-top: 30px;
+      padding-top: 25px;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    .footer p {
+      color: #777;
+      font-size: 13px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="login-container">
+    <div class="logo">
+      <div class="logo-icon">
+        <i class="fa-solid fa-mug-hot"></i>
+      </div>
+      <h1>CoWorking Cafe</h1>
+      <p>Đăng nhập hệ thống</p>
+    </div>
+
+    <div class="error-message" id="errorMessage">
+      <i class="fa-solid fa-circle-exclamation"></i>
+      <span id="errorText"></span>
+    </div>
+
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="username">Username admin hoặc SĐT user</label>
+        <div class="input-wrapper">
+          <i class="fa-solid fa-user"></i>
+          <input type="text" id="username" name="username" placeholder="VD: admin hoặc 0944444444" autocomplete="username"
+            required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="password">Mật khẩu</label>
+        <div class="input-wrapper">
+          <i class="fa-solid fa-lock"></i>
+          <input type="password" id="password" name="password" placeholder="Nhập mật khẩu"
+            autocomplete="current-password" required>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-login" id="btnLogin">
+        <span id="btnText">Đăng nhập</span>
+      </button>
+    </form>
+
+    <div class="footer">
+      <p>© 2024 CoWorking Cafe. All rights reserved.</p>
+    </div>
+  </div>
+
+  <script type="module" src="/js/login-page.js"></script>
+</body>
+
+</html>

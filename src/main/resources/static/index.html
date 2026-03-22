@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CoWorking Cafe - Trang chủ</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .landing-container {
+      text-align: center;
+      color: white;
+      padding: 40px;
+    }
+
+    .logo {
+      font-size: 80px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 48px;
+      margin-bottom: 15px;
+      font-weight: 700;
+    }
+
+    p {
+      font-size: 20px;
+      margin-bottom: 40px;
+      opacity: 0.9;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 15px 40px;
+      border-radius: 30px;
+      font-size: 18px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.3s;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-primary {
+      background: white;
+      color: #667eea;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: white;
+      border: 2px solid white;
+    }
+
+    .btn-secondary:hover {
+      background: white;
+      color: #667eea;
+    }
+
+    .features {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      margin-top: 60px;
+      flex-wrap: wrap;
+    }
+
+    .feature {
+      text-align: center;
+    }
+
+    .feature i {
+      font-size: 40px;
+      margin-bottom: 15px;
+      opacity: 0.9;
+    }
+
+    .feature h3 {
+      font-size: 18px;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="landing-container">
+    <div class="logo">
+      <i class="fa-solid fa-mug-hot"></i>
+    </div>
+    
+    <h1>CoWorking Cafe</h1>
+    <p>Không gian làm việc hiện đại, tiện nghi và thoải mái</p>
+    
+    <div class="btn-group">
+      <a href="/login.html" class="btn btn-primary">
+        <i class="fa-solid fa-sign-in-alt"></i>
+        Đăng nhập
+      </a>
+    </div>
+
+    <div class="features">
+      <div class="feature">
+        <i class="fa-solid fa-wifi"></i>
+        <h3>WiFi Tốc Độ Cao</h3>
+      </div>
+      <div class="feature">
+        <i class="fa-solid fa-coffee"></i>
+        <h3>Đồ Uống Miễn Phí</h3>
+      </div>
+      <div class="feature">
+        <i class="fa-solid fa-clock"></i>
+        <h3>Mở Cửa 24/7</h3>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
