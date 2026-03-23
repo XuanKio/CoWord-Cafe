@@ -135,6 +135,7 @@ public class CafeSessionController {
         map.put("sessionsId", s.getSessionsId());
         map.put("usersId", s.getCustomer().getUsersId());
         map.put("customerName", s.getCustomer().getName());
+        map.put("customerPhone", s.getCustomer().getPhone());
         map.put("checkIn", s.getCheckIn().toString());
         map.put("checkOut", s.getCheckOut() != null ? s.getCheckOut().toString() : null);
         map.put("hoursUsed", s.getHoursUsed());

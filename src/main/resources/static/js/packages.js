@@ -1,6 +1,6 @@
 // ===== PACKAGES MODULE =====
 
-import { getPackages, createPackage, updatePackage, deletePackage, getPackageSales, createPackageSale, getCustomers, saveCustomer, generateId } from './data.js';
+import { getPackages, createPackage, updatePackage, deletePackage, getPackageSales, createPackageSale, getCustomers, generateId } from './data.js';
 import { formatCurrency, formatTime, formatDate, generateAvatar } from './utils.js';
 import { showToast } from './toast.js';
 
@@ -194,12 +194,6 @@ async function handleSellSubmit(e) {
   const customers = await getCustomers();
   const customer = customers.find(c => c.id === customerId);
   if (!p || !customer) return;
-
-  await saveCustomer({
-    ...customer,
-    remainingMinutes: customer.remainingMinutes + p.totalMinutes,
-    totalMinutesBought: customer.totalMinutesBought + p.totalMinutes,
-  });
 
   const newSale = {
     id: generateId('ps'),

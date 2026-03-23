@@ -4,7 +4,7 @@
  *   User:  đăng nhập bằng phone + password   → /api/auth/user
  */
 
-import { authApi } from './api.js';
+import { authApi, customerApi } from './api.js';
 
 const ADMIN_KEY = 'cwc_admin';
 const USER_KEY = 'cwc_user';
@@ -70,6 +70,15 @@ export { adminLogin as login };
 export { getAdminAuth as getAuthUser };
 export { adminLogout as logout };
 export { userLogin as loginUserWithPassword };
+
+export async function changeUserPassword(userId, newPassword) {
+  try {
+    await customerApi.update(userId, { password: newPassword });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // ===== REQUIRE AUTH GUARD =====
 export function requireAuth() {

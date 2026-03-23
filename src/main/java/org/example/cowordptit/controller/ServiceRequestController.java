@@ -144,11 +144,14 @@ public class ServiceRequestController {
         map.put("serviceRequestsId", r.getServiceRequestsId());
         map.put("usersId", r.getCustomer().getUsersId());
         map.put("customerName", r.getCustomer().getName());
+        map.put("customerPhone", r.getCustomer().getPhone());
         map.put("sessionsId", r.getSession() != null ? r.getSession().getSessionsId() : null);
         map.put("servicesId", r.getService() != null ? r.getService().getServicesId() : null);
         map.put("serviceName", r.getService() != null ? r.getService().getName() : null);
+        map.put("serviceType", r.getService() != null ? r.getService().getType().name() : null);
         map.put("packagesId", r.getTimePackage() != null ? r.getTimePackage().getPackagesId() : null);
         map.put("packageName", r.getTimePackage() != null ? r.getTimePackage().getName() : null);
+        map.put("packageHoursAmount", r.getTimePackage() != null ? r.getTimePackage().getHoursAmount() : null);
         map.put("quantity", r.getQuantity());
         map.put("totalPrice", r.getTotalPrice());
         map.put("status", r.getStatus().name());
