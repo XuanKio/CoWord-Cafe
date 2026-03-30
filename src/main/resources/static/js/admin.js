@@ -792,10 +792,6 @@ window.cancelOrder = async function (id) {
 // ===== REPORTS SECTION =====
 window.loadReports = async function () {
   try {
-    const [payments, requests] = await Promise.all([
-      apiRequest('/payments'),
-      apiRequest('/requests')
-    ]);
     const monthFilter = document.getElementById('reportMonthFilter');
     const monthLabel = document.getElementById('reportMonthLabel');
 
@@ -808,90 +804,34 @@ window.loadReports = async function () {
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     if (monthFilter && !monthFilter.value) monthFilter.value = currentMonth;
 
-    const requestById = new Map(requests.map(r => [r.serviceRequestsId, r]));
-    const paymentRequestIds = new Set(payments.map(p => p.serviceRequestsId));
-    const transactions = [];
-
-    payments.forEach((p) => {
-      const req = requestById.get(p.serviceRequestsId);
-      transactions.push({
-        id: `P#${p.transactionsId}`,
-        reqId: p.serviceRequestsId,
-        amount: Number(p.amount) || 0,
-        method: p.paymentMethod || 'CASH',
-        date: p.createdAt,
-        customerName: req?.customerName || 'N/A',
-        itemName: req?.serviceName || req?.packageName || `Yêu cầu #${p.serviceRequestsId}`,
-        itemType: req?.packageName ? 'PACKAGE' : (req?.serviceName ? 'SERVICE' : 'OTHER'),
-        quantity: Number(req?.quantity) || 1
-      });
-    });
-
-    requests
-      .filter(r => (r.status === 'APPROVED' || r.status === 'PAID') && (Number(r.totalPrice) || 0) > 0 && !paymentRequestIds.has(r.serviceRequestsId))
-      .forEach((r) => {
-        transactions.push({
-          id: `R#${r.serviceRequestsId}`,
-          reqId: r.serviceRequestsId,
-          amount: Number(r.totalPrice) || 0,
-          method: 'LEGACY',
-          date: r.createdAt,
-          customerName: r.customerName || 'N/A',
-          itemName: r.serviceName || r.packageName || `Yêu cầu #${r.serviceRequestsId}`,
-          itemType: r.packageName ? 'PACKAGE' : (r.serviceName ? 'SERVICE' : 'OTHER'),
-          quantity: Number(r.quantity) || 1
-        });
-      });
-
     const selectedMonth = monthFilter?.value || currentMonth;
-    const monthTxns = transactions.filter((t) => (t.date || '').startsWith(selectedMonth));
+    const report = await apiRequest(`/reports/transactions?month=${encodeURIComponent(selectedMonth)}`);
 
     if (monthLabel) {
       const [year, month] = selectedMonth.split('-');
       monthLabel.textContent = `Tháng ${month}/${year}`;
     }
 
-    const dailyMap = new Map();
-    monthTxns.forEach((txn) => {
-      const dayKey = (txn.date || '').slice(0, 10);
-      if (!dayKey) return;
+    const summary = report?.summary || {};
+    const dailyRows = (report?.daily || []).map((day) => ({
+      ...day,
+      totalRevenue: Number(day.totalRevenue) || 0,
+      transactionCount: Number(day.transactionCount) || 0,
+      serviceRevenue: Number(day.serviceRevenue) || 0,
+      packageRevenue: Number(day.packageRevenue) || 0,
+      topItems: Array.isArray(day.topItems) ? day.topItems : [],
+      transactions: Array.isArray(day.transactions)
+        ? day.transactions.map((txn) => ({
+          ...txn,
+          amount: Number(txn.amount) || 0,
+          quantity: Number(txn.quantity) || 1
+        }))
+        : []
+    }));
 
-      if (!dailyMap.has(dayKey)) {
-        dailyMap.set(dayKey, {
-          date: dayKey,
-          totalRevenue: 0,
-          transactionCount: 0,
-          serviceRevenue: 0,
-          packageRevenue: 0,
-          items: new Map(),
-          transactions: []
-        });
-      }
-
-      const day = dailyMap.get(dayKey);
-      day.totalRevenue += txn.amount;
-      day.transactionCount += 1;
-      if (txn.itemType === 'SERVICE') day.serviceRevenue += txn.amount;
-      if (txn.itemType === 'PACKAGE') day.packageRevenue += txn.amount;
-
-      const itemKey = `${txn.itemType}:${txn.itemName}`;
-      if (!day.items.has(itemKey)) {
-        day.items.set(itemKey, { name: txn.itemName, type: txn.itemType, qty: 0, revenue: 0 });
-      }
-      const item = day.items.get(itemKey);
-      item.qty += txn.quantity;
-      item.revenue += txn.amount;
-
-      day.transactions.push(txn);
-    });
-
-    const dailyRows = Array.from(dailyMap.values()).sort((a, b) => b.date.localeCompare(a.date));
-
-    const totalRev = dailyRows.reduce((sum, d) => sum + d.totalRevenue, 0);
-    const totalTx = dailyRows.reduce((sum, d) => sum + d.transactionCount, 0);
-    document.getElementById('reportTotalRevenue').textContent = formatCurrency(totalRev);
-    document.getElementById('reportTotalTransactions').textContent = totalTx;
-    document.getElementById('reportActiveDays').textContent = dailyRows.length;
+    document.getElementById('reportTotalRevenue').textContent = formatCurrency(Number(summary.totalRevenue) || 0);
+    document.getElementById('reportTotalTransactions').textContent = Number(summary.totalTransactions) || 0;
+    document.getElementById('reportActiveDays').textContent = Number(summary.activeDays) || 0;
 
     renderReportDailyTable(dailyRows);
     renderReportDetail(dailyRows[0]);
@@ -909,9 +849,7 @@ function renderReportDailyTable(dailyRows) {
   }
 
   tbody.innerHTML = dailyRows.map((day, index) => {
-    const topItems = Array.from(day.items.values())
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 2)
+    const topItems = (day.topItems || [])
       .map((it) => `${it.name} x${it.qty}`)
       .join(' • ');
 

@@ -9,8 +9,11 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -53,6 +56,137 @@ public class ServiceRequestController {
     public ResponseEntity<List<Map<String, Object>>> getByCustomer(@PathVariable Long customerId) {
         return ResponseEntity.ok(requestRepository.findByCustomer_UsersId(customerId)
                 .stream().map(this::toMap).collect(Collectors.toList()));
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<?> search(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String customerName,
+            @RequestParam(required = false, defaultValue = "false") boolean namesOnly,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Long usersId,
+            @RequestParam(required = false) String type) {
+
+        ServiceRequest.RequestStatus statusFilter = null;
+        if (status != null && !status.isBlank()) {
+            try {
+                statusFilter = ServiceRequest.RequestStatus.valueOf(status.trim().toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException ex) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "Status khong hop le. Dung: PENDING, APPROVED, PAID, CANCELLED"));
+            }
+        }
+
+        String typeFilter = null;
+        if (type != null && !type.isBlank()) {
+            typeFilter = type.trim().toUpperCase(Locale.ROOT);
+            if (!"SERVICE".equals(typeFilter) && !"PACKAGE".equals(typeFilter)) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "Type khong hop le. Dung: SERVICE hoac PACKAGE"));
+            }
+        }
+
+        String normalizedKeyword = keyword != null && !keyword.isBlank()
+                ? keyword.trim().toLowerCase(Locale.ROOT)
+                : (q != null ? q.trim().toLowerCase(Locale.ROOT) : "");
+        String normalizedCustomerName = customerName != null
+                ? customerName.trim().toLowerCase(Locale.ROOT)
+                : "";
+        final ServiceRequest.RequestStatus finalStatusFilter = statusFilter;
+        final String finalTypeFilter = typeFilter;
+
+        List<ServiceRequest> source = usersId != null
+                ? requestRepository.findByCustomer_UsersId(usersId)
+                : requestRepository.findAll();
+
+        Comparator<ServiceRequest> createdAtDesc = (a, b) -> {
+            LocalDateTime first = a.getCreatedAt();
+            LocalDateTime second = b.getCreatedAt();
+            if (first == null && second == null) {
+                return 0;
+            }
+            if (first == null) {
+                return 1;
+            }
+            if (second == null) {
+                return -1;
+            }
+            return second.compareTo(first);
+        };
+
+        List<ServiceRequest> filtered = source.stream()
+                .filter(r -> finalStatusFilter == null || r.getStatus() == finalStatusFilter)
+                .filter(r -> {
+                    if (finalTypeFilter == null) {
+                        return true;
+                    }
+                    if ("SERVICE".equals(finalTypeFilter)) {
+                        return r.getService() != null;
+                    }
+                    return r.getTimePackage() != null;
+                })
+                .filter(r -> {
+                    if (!normalizedCustomerName.isBlank()) {
+                        String nameOnly = r.getCustomer() != null && r.getCustomer().getName() != null
+                                ? r.getCustomer().getName().toLowerCase(Locale.ROOT)
+                                : "";
+                        return nameOnly.contains(normalizedCustomerName);
+                    }
+                    if (normalizedKeyword.isBlank()) {
+                        return true;
+                    }
+                    String customerNameValue = r.getCustomer() != null && r.getCustomer().getName() != null
+                            ? r.getCustomer().getName().toLowerCase(Locale.ROOT)
+                            : "";
+                    String customerPhone = r.getCustomer() != null && r.getCustomer().getPhone() != null
+                            ? r.getCustomer().getPhone().toLowerCase(Locale.ROOT)
+                            : "";
+                    String serviceName = r.getService() != null && r.getService().getName() != null
+                            ? r.getService().getName().toLowerCase(Locale.ROOT)
+                            : "";
+                    String packageName = r.getTimePackage() != null && r.getTimePackage().getName() != null
+                            ? r.getTimePackage().getName().toLowerCase(Locale.ROOT)
+                            : "";
+                    String reqId = r.getServiceRequestsId() != null ? String.valueOf(r.getServiceRequestsId()) : "";
+
+                    return customerNameValue.contains(normalizedKeyword)
+                            || customerPhone.contains(normalizedKeyword)
+                            || serviceName.contains(normalizedKeyword)
+                            || packageName.contains(normalizedKeyword)
+                            || reqId.contains(normalizedKeyword);
+                })
+                .sorted(createdAtDesc)
+                .collect(Collectors.toList());
+
+        List<Map<String, Object>> items = filtered.stream()
+                .map(this::toMap)
+                .collect(Collectors.toList());
+
+        List<String> names = filtered.stream()
+                .map(r -> r.getCustomer() != null ? r.getCustomer().getName() : null)
+                .filter(name -> name != null && !name.isBlank())
+                .distinct()
+                .collect(Collectors.toList());
+
+        Map<String, Object> filters = new LinkedHashMap<>();
+        filters.put("q", q);
+        filters.put("keyword", keyword);
+        filters.put("customerName", customerName);
+        filters.put("namesOnly", namesOnly);
+        filters.put("status", statusFilter != null ? statusFilter.name() : null);
+        filters.put("usersId", usersId);
+        filters.put("type", typeFilter);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("success", true);
+        response.put("count", namesOnly ? names.size() : items.size());
+        response.put("filters", filters);
+        response.put("items", namesOnly ? names : items);
+
+        return ResponseEntity.ok(response);
     }
 
     /** Tạo yêu cầu mới (user gọi) */

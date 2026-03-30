@@ -232,4 +232,10 @@ export const packageSaleApi = {
 // ===== REPORTS =====
 export const reportApi = {
   getAll: () => apiRequest('/reports'),
+  getTransactions: (month) => {
+    const params = new URLSearchParams();
+    if (month) params.set('month', month);
+    const query = params.toString();
+    return apiRequest(`/reports/transactions${query ? `?${query}` : ''}`);
+  },
 };
