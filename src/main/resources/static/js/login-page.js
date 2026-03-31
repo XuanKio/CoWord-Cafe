@@ -87,6 +87,7 @@ function saveUserSession(data) {
 
 async function handleLogin(event) {
   event.preventDefault();
+  let adminErrorMessage = null;
   const username = document.getElementById('username')?.value.trim() || '';
   const password = document.getElementById('password')?.value || '';
 
@@ -99,34 +100,24 @@ async function handleLogin(event) {
   setLoading(true);
 
   try {
-    let adminData = null;
     try {
-      adminData = await authApi.adminLogin(username, password);
-      if (adminData?.success) {
-        saveAdminSession(adminData);
-        window.location.href = '/admin.html';
-        return;
-      }
+      const adminData = await authApi.adminLogin(username, password);
+      saveAdminSession(adminData);
+      window.location.href = '/admin.html';
+      return;
     } catch (adminError) {
       if (adminError?.status && adminError.status !== 401) {
         throw adminError;
       }
+      adminErrorMessage = adminError?.message || null;
     }
 
     const userData = await authApi.userLogin(username, password);
-    if (userData?.success) {
-      saveUserSession(userData);
-      window.location.href = '/user.html';
-      return;
-    }
-
-    showError(userData?.message || adminData?.message || 'Ten dang nhap hoac mat khau khong dung.');
+    saveUserSession(userData);
+    window.location.href = '/user.html';
+    return;
   } catch (error) {
-    if (error?.message) {
-      showError(error.message);
-    } else {
-      showError('Khong the ket noi den server. Vui long thu lai.');
-    }
+    showError(error?.message || adminErrorMessage || 'Khong the ket noi den server. Vui long thu lai.');
   } finally {
     setLoading(false);
   }

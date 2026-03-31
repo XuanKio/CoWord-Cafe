@@ -54,14 +54,14 @@ public class DataInitializer {
             // ===== SERVICES (MENU) =====
             if (cafeServiceRepository.count() == 0) {
                 cafeServiceRepository
-                        .save(makeService("Ca phe den", CafeService.ServiceType.DRINK, new BigDecimal("25000")));
+                        .save(makeService("Ca phe den", MenuIItem.ServiceType.DRINK, new BigDecimal("25000")));
                 cafeServiceRepository
-                        .save(makeService("Ca phe sua", CafeService.ServiceType.DRINK, new BigDecimal("30000")));
+                        .save(makeService("Ca phe sua", MenuIItem.ServiceType.DRINK, new BigDecimal("30000")));
                 cafeServiceRepository
-                        .save(makeService("Tra dao", CafeService.ServiceType.DRINK, new BigDecimal("30000")));
-                cafeServiceRepository.save(makeService("Mi ly", CafeService.ServiceType.FOOD, new BigDecimal("20000")));
+                        .save(makeService("Tra dao", MenuIItem.ServiceType.DRINK, new BigDecimal("30000")));
+                cafeServiceRepository.save(makeService("Mi ly", MenuIItem.ServiceType.FOOD, new BigDecimal("20000")));
                 cafeServiceRepository
-                        .save(makeService("Banh mi", CafeService.ServiceType.FOOD, new BigDecimal("15000")));
+                        .save(makeService("Banh mi", MenuIItem.ServiceType.FOOD, new BigDecimal("15000")));
                 System.out.println("✅ Created 5 menu items");
             }
 
@@ -97,12 +97,12 @@ public class DataInitializer {
         return p;
     }
 
-    private CafeService makeService(String name, CafeService.ServiceType type, BigDecimal price) {
-        CafeService s = new CafeService();
+    private MenuIItem makeService(String name, MenuIItem.ServiceType type, BigDecimal price) {
+        MenuIItem s = new MenuIItem();
         s.setName(name);
         s.setType(type);
         s.setPrice(price);
-        s.setStatus(CafeService.ServiceStatus.AVAILABLE);
+        s.setStatus(MenuIItem.ServiceStatus.AVAILABLE);
         return s;
     }
 }

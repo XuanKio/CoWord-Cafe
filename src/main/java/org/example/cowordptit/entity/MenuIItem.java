@@ -16,7 +16,7 @@ import java.math.BigDecimal;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class CafeService {
+public class MenuIItem {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

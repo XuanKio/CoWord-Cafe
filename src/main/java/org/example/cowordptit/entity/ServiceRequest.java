@@ -37,7 +37,7 @@ public class ServiceRequest {
     /** Dịch vụ đồ ăn/nước (null nếu là yêu cầu mua gói giờ) */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "services_id")
-    private CafeService service;
+    private MenuIItem service;
 
     /** Gói giờ (null nếu là yêu cầu gọi đồ ăn/nước) */
     @ManyToOne(fetch = FetchType.LAZY)

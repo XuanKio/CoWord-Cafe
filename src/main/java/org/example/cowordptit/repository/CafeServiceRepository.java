@@ -1,11 +1,11 @@
 package org.example.cowordptit.repository;
 
-import org.example.cowordptit.entity.CafeService;
+import org.example.cowordptit.entity.MenuIItem;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
-public interface CafeServiceRepository extends JpaRepository<CafeService, Long> {
-    List<CafeService> findByStatus(CafeService.ServiceStatus status);
+public interface CafeServiceRepository extends JpaRepository<MenuIItem, Long> {
+    List<MenuIItem> findByStatus(MenuIItem.ServiceStatus status);
 
-    List<CafeService> findByType(CafeService.ServiceType type);
+    List<MenuIItem> findByType(MenuIItem.ServiceType type);
 }

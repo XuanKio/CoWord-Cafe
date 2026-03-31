@@ -13,14 +13,10 @@ const USER_KEY = 'cwc_user';
 export async function adminLogin(username, password) {
   try {
     const data = await authApi.adminLogin(username, password);
-    if (data.success) {
-      // Lưu cả admin info và token
-      const userData = { ...data.admin, token: data.token, role: 'ADMIN' };
-      localStorage.setItem('user', JSON.stringify(userData));
-      sessionStorage.setItem(ADMIN_KEY, JSON.stringify(data.admin));
-      return { success: true, admin: data.admin };
-    }
-    return { success: false, message: data.message };
+    const userData = { ...data.admin, token: data.token, role: 'ADMIN' };
+    localStorage.setItem('user', JSON.stringify(userData));
+    sessionStorage.setItem(ADMIN_KEY, JSON.stringify(data.admin));
+    return { success: true, admin: data.admin };
   } catch (err) {
     return { success: false, message: err.message || 'Không thể kết nối máy chủ.' };
   }
@@ -41,14 +37,10 @@ export function adminLogout() {
 export async function userLogin(phone, password) {
   try {
     const data = await authApi.userLogin(phone, password);
-    if (data.success) {
-      // Lưu cả customer info và token
-      const userData = { ...data.customer, token: data.token, role: 'USER' };
-      localStorage.setItem('user', JSON.stringify(userData));
-      sessionStorage.setItem(USER_KEY, JSON.stringify(data.customer));
-      return { success: true, customer: data.customer };
-    }
-    return { success: false, message: data.message };
+    const userData = { ...data.customer, token: data.token, role: 'USER' };
+    localStorage.setItem('user', JSON.stringify(userData));
+    sessionStorage.setItem(USER_KEY, JSON.stringify(data.customer));
+    return { success: true, customer: data.customer, user: data.customer };
   } catch (err) {
     return { success: false, message: err.message || 'Không thể kết nối máy chủ.' };
   }

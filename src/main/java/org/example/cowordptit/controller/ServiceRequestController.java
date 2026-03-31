@@ -1,21 +1,15 @@
 package org.example.cowordptit.controller;
 
 import lombok.RequiredArgsConstructor;
-import org.example.cowordptit.entity.*;
-import org.example.cowordptit.repository.*;
+import org.example.cowordptit.dto.request.CreateServiceRequestDto;
+import org.example.cowordptit.dto.response.ApiResponse;
+import org.example.cowordptit.service.ServiceRequestService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * ServiceRequestController — Yêu cầu gọi dịch vụ hoặc mua gói giờ
@@ -33,33 +27,25 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ServiceRequestController {
 
-    private final ServiceRequestRepository requestRepository;
-    private final CustomerRepository customerRepository;
-    private final CafeSessionRepository sessionRepository;
-    private final CafeServiceRepository cafeServiceRepository;
-    private final PackageRepository packageRepository;
+    private final ServiceRequestService serviceRequestService;
 
     @GetMapping
-    public ResponseEntity<List<Map<String, Object>>> getAll() {
-        return ResponseEntity.ok(requestRepository.findAll().stream()
-                .map(this::toMap).collect(Collectors.toList()));
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getAll() {
+        return ResponseEntity.ok(ApiResponse.success(serviceRequestService.getAll()));
     }
 
     @GetMapping("/pending")
-    public ResponseEntity<List<Map<String, Object>>> getPending() {
-        return ResponseEntity.ok(
-                requestRepository.findByStatus(ServiceRequest.RequestStatus.PENDING)
-                        .stream().map(this::toMap).collect(Collectors.toList()));
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getPending() {
+        return ResponseEntity.ok(ApiResponse.success(serviceRequestService.getPending()));
     }
 
     @GetMapping("/customer/{customerId}")
-    public ResponseEntity<List<Map<String, Object>>> getByCustomer(@PathVariable Long customerId) {
-        return ResponseEntity.ok(requestRepository.findByCustomer_UsersId(customerId)
-                .stream().map(this::toMap).collect(Collectors.toList()));
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getByCustomer(@PathVariable Long customerId) {
+        return ResponseEntity.ok(ApiResponse.success(serviceRequestService.getByCustomer(customerId)));
     }
 
     @GetMapping("/search")
-    public ResponseEntity<?> search(
+    public ResponseEntity<ApiResponse<Map<String, Object>>> search(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String customerName,
@@ -67,171 +53,21 @@ public class ServiceRequestController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Long usersId,
             @RequestParam(required = false) String type) {
-
-        ServiceRequest.RequestStatus statusFilter = null;
-        if (status != null && !status.isBlank()) {
-            try {
-                statusFilter = ServiceRequest.RequestStatus.valueOf(status.trim().toUpperCase(Locale.ROOT));
-            } catch (IllegalArgumentException ex) {
-                return ResponseEntity.badRequest().body(Map.of(
-                        "success", false,
-                        "message", "Status khong hop le. Dung: PENDING, APPROVED, PAID, CANCELLED"));
-            }
-        }
-
-        String typeFilter = null;
-        if (type != null && !type.isBlank()) {
-            typeFilter = type.trim().toUpperCase(Locale.ROOT);
-            if (!"SERVICE".equals(typeFilter) && !"PACKAGE".equals(typeFilter)) {
-                return ResponseEntity.badRequest().body(Map.of(
-                        "success", false,
-                        "message", "Type khong hop le. Dung: SERVICE hoac PACKAGE"));
-            }
-        }
-
-        String normalizedKeyword = keyword != null && !keyword.isBlank()
-                ? keyword.trim().toLowerCase(Locale.ROOT)
-                : (q != null ? q.trim().toLowerCase(Locale.ROOT) : "");
-        String normalizedCustomerName = customerName != null
-                ? customerName.trim().toLowerCase(Locale.ROOT)
-                : "";
-        final ServiceRequest.RequestStatus finalStatusFilter = statusFilter;
-        final String finalTypeFilter = typeFilter;
-
-        List<ServiceRequest> source = usersId != null
-                ? requestRepository.findByCustomer_UsersId(usersId)
-                : requestRepository.findAll();
-
-        Comparator<ServiceRequest> createdAtDesc = (a, b) -> {
-            LocalDateTime first = a.getCreatedAt();
-            LocalDateTime second = b.getCreatedAt();
-            if (first == null && second == null) {
-                return 0;
-            }
-            if (first == null) {
-                return 1;
-            }
-            if (second == null) {
-                return -1;
-            }
-            return second.compareTo(first);
-        };
-
-        List<ServiceRequest> filtered = source.stream()
-                .filter(r -> finalStatusFilter == null || r.getStatus() == finalStatusFilter)
-                .filter(r -> {
-                    if (finalTypeFilter == null) {
-                        return true;
-                    }
-                    if ("SERVICE".equals(finalTypeFilter)) {
-                        return r.getService() != null;
-                    }
-                    return r.getTimePackage() != null;
-                })
-                .filter(r -> {
-                    if (!normalizedCustomerName.isBlank()) {
-                        String nameOnly = r.getCustomer() != null && r.getCustomer().getName() != null
-                                ? r.getCustomer().getName().toLowerCase(Locale.ROOT)
-                                : "";
-                        return nameOnly.contains(normalizedCustomerName);
-                    }
-                    if (normalizedKeyword.isBlank()) {
-                        return true;
-                    }
-                    String customerNameValue = r.getCustomer() != null && r.getCustomer().getName() != null
-                            ? r.getCustomer().getName().toLowerCase(Locale.ROOT)
-                            : "";
-                    String customerPhone = r.getCustomer() != null && r.getCustomer().getPhone() != null
-                            ? r.getCustomer().getPhone().toLowerCase(Locale.ROOT)
-                            : "";
-                    String serviceName = r.getService() != null && r.getService().getName() != null
-                            ? r.getService().getName().toLowerCase(Locale.ROOT)
-                            : "";
-                    String packageName = r.getTimePackage() != null && r.getTimePackage().getName() != null
-                            ? r.getTimePackage().getName().toLowerCase(Locale.ROOT)
-                            : "";
-                    String reqId = r.getServiceRequestsId() != null ? String.valueOf(r.getServiceRequestsId()) : "";
-
-                    return customerNameValue.contains(normalizedKeyword)
-                            || customerPhone.contains(normalizedKeyword)
-                            || serviceName.contains(normalizedKeyword)
-                            || packageName.contains(normalizedKeyword)
-                            || reqId.contains(normalizedKeyword);
-                })
-                .sorted(createdAtDesc)
-                .collect(Collectors.toList());
-
-        List<Map<String, Object>> items = filtered.stream()
-                .map(this::toMap)
-                .collect(Collectors.toList());
-
-        List<String> names = filtered.stream()
-                .map(r -> r.getCustomer() != null ? r.getCustomer().getName() : null)
-                .filter(name -> name != null && !name.isBlank())
-                .distinct()
-                .collect(Collectors.toList());
-
-        Map<String, Object> filters = new LinkedHashMap<>();
-        filters.put("q", q);
-        filters.put("keyword", keyword);
-        filters.put("customerName", customerName);
-        filters.put("namesOnly", namesOnly);
-        filters.put("status", statusFilter != null ? statusFilter.name() : null);
-        filters.put("usersId", usersId);
-        filters.put("type", typeFilter);
-
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("success", true);
-        response.put("count", namesOnly ? names.size() : items.size());
-        response.put("filters", filters);
-        response.put("items", namesOnly ? names : items);
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success(
+                serviceRequestService.search(q, keyword, customerName, namesOnly, status, usersId, type)));
     }
 
     /** Tạo yêu cầu mới (user gọi) */
     @PostMapping
-    public ResponseEntity<?> create(@RequestBody CreateRequestBody req) {
-        Customer customer = customerRepository.findById(req.getUsersId()).orElse(null);
-        if (customer == null)
-            return ResponseEntity.badRequest()
-                    .body(Map.of("success", false, "message", "Khách hàng không tồn tại"));
-
-        ServiceRequest serviceRequest = new ServiceRequest();
-        serviceRequest.setCustomer(customer);
-        serviceRequest.setQuantity(req.getQuantity() != null ? req.getQuantity() : 1);
-        serviceRequest.setCreatedAt(LocalDateTime.now());
-        serviceRequest.setStatus(ServiceRequest.RequestStatus.PENDING);
-
-        // Gắn phiên nếu có
-        if (req.getSessionsId() != null) {
-            sessionRepository.findById(req.getSessionsId())
-                    .ifPresent(serviceRequest::setSession);
-        }
-
-        // Tính total_price và gắn dịch vụ / gói giờ
-        if (req.getServicesId() != null) {
-            CafeService svc = cafeServiceRepository.findById(req.getServicesId()).orElse(null);
-            if (svc == null)
-                return ResponseEntity.badRequest()
-                        .body(Map.of("success", false, "message", "Dịch vụ không tồn tại"));
-            serviceRequest.setService(svc);
-            serviceRequest.setTotalPrice(svc.getPrice().multiply(BigDecimal.valueOf(serviceRequest.getQuantity())));
-        } else if (req.getPackagesId() != null) {
-            TimePackage pkg = packageRepository.findById(req.getPackagesId()).orElse(null);
-            if (pkg == null)
-                return ResponseEntity.badRequest()
-                        .body(Map.of("success", false, "message", "Gói giờ không tồn tại"));
-            serviceRequest.setTimePackage(pkg);
-            serviceRequest.setTotalPrice(pkg.getPrice().multiply(BigDecimal.valueOf(serviceRequest.getQuantity())));
-        } else {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("success", false, "message", "Cần chọn dịch vụ hoặc gói giờ"));
-        }
-
-        ServiceRequest saved = requestRepository.save(serviceRequest);
+    public ResponseEntity<ApiResponse<Map<String, Object>>> create(@RequestBody CreateServiceRequestDto req) {
+        Map<String, Object> item = serviceRequestService.create(
+                req.getUsersId(),
+                req.getSessionsId(),
+                req.getServicesId(),
+                req.getPackagesId(),
+                req.getQuantity());
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(Map.of("success", true, "request", toMap(saved)));
+                .body(ApiResponse.success("Tạo yêu cầu thành công", item));
     }
 
     /**
@@ -240,102 +76,19 @@ public class ServiceRequestController {
      * - Đổi status → APPROVED
      */
     @PatchMapping("/{id}/approve")
-    public ResponseEntity<?> approve(@PathVariable Long id) {
-        return requestRepository.findById(id).map(req -> {
-            if (req.getStatus() != ServiceRequest.RequestStatus.PENDING) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("success", false, "message", "Yêu cầu phải ở trạng thái PENDING"));
-            }
-
-            req.setStatus(ServiceRequest.RequestStatus.APPROVED);
-
-            // Nếu là gói giờ → nạp giờ vào tài khoản
-            if (req.getTimePackage() != null) {
-                Customer customer = req.getCustomer();
-                BigDecimal addHours = req.getTimePackage().getHoursAmount()
-                        .multiply(BigDecimal.valueOf(req.getQuantity()));
-                customer.setRemainingHours(customer.getRemainingHours().add(addHours));
-                customerRepository.save(customer);
-            }
-
-            ServiceRequest saved = requestRepository.save(req);
-            return ResponseEntity.ok(Map.of("success", true, "request", toMap(saved)));
-        }).orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<ApiResponse<Map<String, Object>>> approve(@PathVariable Long id) {
+        return serviceRequestService.approve(id)
+                .map(item -> ResponseEntity.ok(ApiResponse.success("Duyệt yêu cầu thành công", item)))
+                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(ApiResponse.error("Không tìm thấy yêu cầu")));
     }
 
     /** Huỷ yêu cầu */
     @PatchMapping("/{id}/cancel")
-    public ResponseEntity<?> cancel(@PathVariable Long id) {
-        return requestRepository.findById(id).map(req -> {
-            req.setStatus(ServiceRequest.RequestStatus.CANCELLED);
-            return ResponseEntity.ok(Map.of("success", true, "request", toMap(requestRepository.save(req))));
-        }).orElse(ResponseEntity.notFound().build());
-    }
-
-    // ===== Helper =====
-    private Map<String, Object> toMap(ServiceRequest r) {
-        Map<String, Object> map = new HashMap<>();
-        map.put("serviceRequestsId", r.getServiceRequestsId());
-        map.put("usersId", r.getCustomer().getUsersId());
-        map.put("customerName", r.getCustomer().getName());
-        map.put("customerPhone", r.getCustomer().getPhone());
-        map.put("sessionsId", r.getSession() != null ? r.getSession().getSessionsId() : null);
-        map.put("servicesId", r.getService() != null ? r.getService().getServicesId() : null);
-        map.put("serviceName", r.getService() != null ? r.getService().getName() : null);
-        map.put("serviceType", r.getService() != null ? r.getService().getType().name() : null);
-        map.put("packagesId", r.getTimePackage() != null ? r.getTimePackage().getPackagesId() : null);
-        map.put("packageName", r.getTimePackage() != null ? r.getTimePackage().getName() : null);
-        map.put("packageHoursAmount", r.getTimePackage() != null ? r.getTimePackage().getHoursAmount() : null);
-        map.put("quantity", r.getQuantity());
-        map.put("totalPrice", r.getTotalPrice());
-        map.put("status", r.getStatus().name());
-        map.put("createdAt", r.getCreatedAt().toString());
-        return map;
-    }
-
-    // ===== Inner Request Class =====
-    public static class CreateRequestBody {
-        private Long usersId, sessionsId, servicesId, packagesId;
-        private Integer quantity;
-
-        public Long getUsersId() {
-            return usersId;
-        }
-
-        public Long getSessionsId() {
-            return sessionsId;
-        }
-
-        public Long getServicesId() {
-            return servicesId;
-        }
-
-        public Long getPackagesId() {
-            return packagesId;
-        }
-
-        public Integer getQuantity() {
-            return quantity;
-        }
-
-        public void setUsersId(Long id) {
-            this.usersId = id;
-        }
-
-        public void setSessionsId(Long id) {
-            this.sessionsId = id;
-        }
-
-        public void setServicesId(Long id) {
-            this.servicesId = id;
-        }
-
-        public void setPackagesId(Long id) {
-            this.packagesId = id;
-        }
-
-        public void setQuantity(Integer q) {
-            this.quantity = q;
-        }
+    public ResponseEntity<ApiResponse<Map<String, Object>>> cancel(@PathVariable Long id) {
+        return serviceRequestService.cancel(id)
+                .map(item -> ResponseEntity.ok(ApiResponse.success("Hủy yêu cầu thành công", item)))
+                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(ApiResponse.error("Không tìm thấy yêu cầu")));
     }
 }

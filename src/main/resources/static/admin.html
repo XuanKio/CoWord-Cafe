@@ -282,6 +282,7 @@
             <p>Đang tải...</p>
           </div>
         </div>
+        <div class="orders-pagination" id="ordersPagination"></div>
       </div>
     </section>
 
@@ -499,6 +500,40 @@
             Ngay</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal thao tác Check-in / Check-out -->
+  <div class="modal-overlay hidden" id="actionModalOverlay">
+    <div class="modal" style="max-width:460px">
+      <div class="modal-header">
+        <h3 id="actionModalTitle">Xác nhận thao tác</h3>
+        <button class="modal-close" onclick="closeActionModal()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div id="actionModalMessage" class="action-modal-message"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="actionModalCancelBtn" class="btn-secondary" onclick="closeActionModal()">Hủy</button>
+        <button type="button" id="actionModalConfirmBtn" class="btn-primary">Xác nhận</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Chi tiết yêu cầu -->
+  <div class="modal-overlay hidden" id="orderDetailModalOverlay">
+    <div class="modal modal-order-detail">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-bell"></i> Chi tiết yêu cầu</h3>
+        <button class="modal-close" onclick="closeOrderDetailModal()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body" id="orderDetailModalBody">
+        <div class="empty-state" style="padding:20px 10px">
+          <i class="fa-solid fa-spinner fa-spin"></i>
+          <p>Đang tải dữ liệu...</p>
+        </div>
+      </div>
+      <div class="modal-footer" id="orderDetailModalFooter" style="display:none"></div>
     </div>
   </div>
 

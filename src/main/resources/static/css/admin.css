@@ -801,6 +801,74 @@
   font-weight: 500;
 }
 
+.orders-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.orders-page-btn {
+  min-width: 34px;
+  height: 34px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  padding: 0 10px;
+}
+
+.orders-page-btn:hover:not(:disabled) {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.orders-page-btn.active {
+  background: var(--primary-color);
+  color: var(--white);
+  border-color: var(--primary-color);
+}
+
+.orders-page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.order-detail-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--border-color);
+}
+
+.order-detail-row:last-child {
+  border-bottom: none;
+}
+
+.order-detail-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.order-detail-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+  text-align: right;
+}
+
+.action-modal-message {
+  font-size: 14px;
+  color: var(--text-main);
+  line-height: 1.55;
+}
+
 /* ===== BADGE COLORS ===== */
 .badge-success {
   background: #dcfce7;
@@ -842,5 +910,9 @@
 
   .session-row {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .orders-pagination {
+    justify-content: center;
   }
 }

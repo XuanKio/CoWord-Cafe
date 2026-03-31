@@ -51,6 +51,11 @@ function showSection(sectionId) {
 let allCustomersMap = {};
 let allServicesMap = {};
 let allPackagesMap = {};
+let allOrdersCache = [];
+let currentOrderFilter = 'ALL';
+let currentOrderPage = 1;
+const ORDERS_PAGE_SIZE = 8;
+let currentOrderModalId = null;
 
 // ===== UTILITIES =====
 function formatCurrency(amount) {
@@ -106,6 +111,80 @@ window.closeModal = function (modalId) {
 window.openModal = function (modalId) {
   document.getElementById(modalId).classList.remove('hidden');
   document.getElementById(modalId).classList.add('show');
+};
+
+let actionModalHandler = null;
+let actionModalBound = false;
+
+function initActionModal() {
+  if (actionModalBound) return;
+
+  const overlay = document.getElementById('actionModalOverlay');
+  const confirmBtn = document.getElementById('actionModalConfirmBtn');
+  if (!overlay || !confirmBtn) return;
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target.id === 'actionModalOverlay') closeActionModal();
+  });
+
+  confirmBtn.addEventListener('click', async () => {
+    if (!actionModalHandler) {
+      closeActionModal();
+      return;
+    }
+
+    const currentLabel = confirmBtn.innerHTML;
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...';
+
+    try {
+      await actionModalHandler();
+    } finally {
+      confirmBtn.disabled = false;
+      confirmBtn.innerHTML = currentLabel;
+    }
+  });
+
+  actionModalBound = true;
+}
+
+function openActionModal({ title, message, confirmText = 'Xác nhận', cancelText = 'Hủy', hideCancel = false, confirmClass = 'btn-primary', onConfirm = null }) {
+  initActionModal();
+  const overlay = document.getElementById('actionModalOverlay');
+  const titleEl = document.getElementById('actionModalTitle');
+  const messageEl = document.getElementById('actionModalMessage');
+  const confirmBtn = document.getElementById('actionModalConfirmBtn');
+  const cancelBtn = document.getElementById('actionModalCancelBtn');
+  if (!overlay || !titleEl || !messageEl || !confirmBtn || !cancelBtn) return;
+
+  titleEl.textContent = title || 'Xác nhận thao tác';
+  messageEl.textContent = message || '';
+  confirmBtn.textContent = confirmText;
+  cancelBtn.textContent = cancelText;
+  confirmBtn.className = confirmClass;
+  cancelBtn.style.display = hideCancel ? 'none' : 'inline-flex';
+
+  actionModalHandler = typeof onConfirm === 'function' ? onConfirm : null;
+  overlay.classList.remove('hidden');
+  overlay.classList.add('show');
+}
+
+function showInfoModal(title, message) {
+  openActionModal({
+    title,
+    message,
+    confirmText: 'Đóng',
+    hideCancel: true,
+    onConfirm: () => closeActionModal()
+  });
+}
+
+window.closeActionModal = function () {
+  actionModalHandler = null;
+  const overlay = document.getElementById('actionModalOverlay');
+  if (!overlay) return;
+  overlay.classList.remove('show');
+  overlay.classList.add('hidden');
 };
 
 window.logout = function () {
@@ -248,7 +327,7 @@ document.getElementById('btnSearchCheckin').addEventListener('click', async () =
   const resContainer = document.getElementById('checkinResult');
 
   if (!phone) {
-    alert("Vui lòng nhập SĐT !");
+    showInfoModal('Thiếu thông tin', 'Vui lòng nhập số điện thoại để tìm khách check-in.');
     return;
   }
   resContainer.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i></div>`;
@@ -282,30 +361,50 @@ document.getElementById('btnSearchCheckin').addEventListener('click', async () =
 });
 
 window.doCheckIn = async function (usersId) {
-  try {
-    await apiRequest('/sessions/checkin', {
-      method: 'POST',
-      body: JSON.stringify({ usersId: parseInt(usersId) })
-    });
-    alert("Check-in thành công!");
-    document.getElementById('checkinPhone').value = '';
-    document.getElementById('checkinResult').innerHTML = `<div class="empty-state"><p>Đã check-in thành công. Tìm KH khác.</p></div>`;
-    loadCheckinSection();
-    loadDashboard();
-  } catch (err) {
-    alert('Lỗi Check-in: Khách hàng có thể đang checkin rồi hoặc không đủ giờ.');
-  }
+  openActionModal({
+    title: 'Xác nhận Check-in',
+    message: 'Bạn muốn check-in khách hàng này ngay bây giờ?',
+    confirmText: 'Check-in',
+    confirmClass: 'btn-primary',
+    onConfirm: async () => {
+      try {
+        await apiRequest('/sessions/checkin', {
+          method: 'POST',
+          body: JSON.stringify({ usersId: parseInt(usersId) })
+        });
+        closeActionModal();
+        document.getElementById('checkinPhone').value = '';
+        document.getElementById('checkinResult').innerHTML = `<div class="empty-state"><p>Đã check-in thành công. Tìm KH khác.</p></div>`;
+        loadCheckinSection();
+        loadDashboard();
+        showInfoModal('Check-in thành công', 'Khách hàng đã được check-in và bắt đầu phiên làm việc.');
+      } catch (err) {
+        closeActionModal();
+        showInfoModal('Check-in thất bại', 'Khách hàng có thể đang check-in rồi hoặc không đủ giờ còn lại.');
+      }
+    }
+  });
 }
 
 window.doCheckOut = async function (sessionId) {
-  if (!confirm('Xác nhận thiết lập trạng thái Check-out cho khách này?')) return;
-  try {
-    await apiRequest(`/sessions/${sessionId}/checkout`, { method: 'PUT' });
-    if (document.getElementById('section-checkin').classList.contains('active')) loadCheckinSection();
-    loadDashboard();
-  } catch (e) {
-    alert('Check-out thất bại: ' + e.message);
-  }
+  openActionModal({
+    title: 'Xác nhận Check-out',
+    message: 'Bạn muốn check-out khách hàng này khỏi phiên hiện tại?',
+    confirmText: 'Check-out',
+    confirmClass: 'btn-danger',
+    onConfirm: async () => {
+      try {
+        await apiRequest(`/sessions/${sessionId}/checkout`, { method: 'PUT' });
+        closeActionModal();
+        if (document.getElementById('section-checkin').classList.contains('active')) loadCheckinSection();
+        loadDashboard();
+        showInfoModal('Check-out thành công', 'Khách hàng đã được check-out khỏi hệ thống.');
+      } catch (e) {
+        closeActionModal();
+        showInfoModal('Check-out thất bại', 'Không thể check-out: ' + e.message);
+      }
+    }
+  });
 }
 
 
@@ -354,19 +453,32 @@ window.openAddHoursModal = function (id) {
 window.submitAddHours = async function () {
   const id = document.getElementById('addHoursCustomerId').value;
   const hours = parseFloat(document.getElementById('addHoursValue').value);
-  if (!hours || hours <= 0) return alert("Vui lòng nhập số giờ hợp lệ (> 0)");
-
-  try {
-    await apiRequest(`/customers/${id}/add-hours`, {
-      method: 'PATCH',
-      body: JSON.stringify({ hours: hours, note: 'Nạp thủ công' })
-    });
-    alert("Nạp giờ thành công!");
-    closeModal('addHoursModalOverlay');
-    loadCustomers();
-  } catch (e) {
-    alert("Nạp giờ thất bại: " + e.message);
+  if (!hours || hours <= 0) {
+    showInfoModal('Dữ liệu không hợp lệ', 'Vui lòng nhập số giờ hợp lệ lớn hơn 0.');
+    return;
   }
+
+  openActionModal({
+    title: 'Xác nhận nạp giờ',
+    message: `Bạn muốn nạp ${hours} giờ cho khách hàng này?`,
+    confirmText: 'Nạp giờ',
+    onConfirm: async () => {
+      try {
+        await apiRequest(`/customers/${id}/add-hours`, {
+          method: 'PATCH',
+          body: JSON.stringify({ hours: hours, note: 'Nạp thủ công' })
+        });
+        closeModal('addHoursModalOverlay');
+        closeActionModal();
+        await loadCustomers();
+        await loadDashboard();
+        showInfoModal('Nạp giờ thành công', 'Số giờ đã được cộng vào tài khoản khách hàng.');
+      } catch (e) {
+        closeActionModal();
+        showInfoModal('Nạp giờ thất bại', e.message || 'Có lỗi xảy ra khi nạp giờ.');
+      }
+    }
+  });
 };
 
 window.openCustomerModal = function (id = null) {
@@ -401,12 +513,24 @@ window.openCustomerModal = function (id = null) {
 }
 
 window.deleteCustomer = async function (id) {
-  if (!confirm('Xác nhận xóa khách hàng này?')) return;
-  try {
-    await apiRequest(`/customers/${id}`, { method: 'DELETE' });
-    loadCustomers();
-    loadDashboard();
-  } catch (e) { alert('Lỗi: ' + e.message); }
+  openActionModal({
+    title: 'Xóa khách hàng',
+    message: 'Bạn chắc chắn muốn xóa khách hàng này? Thao tác này không thể hoàn tác.',
+    confirmText: 'Xóa',
+    confirmClass: 'btn-danger',
+    onConfirm: async () => {
+      try {
+        await apiRequest(`/customers/${id}`, { method: 'DELETE' });
+        closeActionModal();
+        await loadCustomers();
+        await loadDashboard();
+        showInfoModal('Đã xóa khách hàng', 'Dữ liệu khách hàng đã được xóa khỏi hệ thống.');
+      } catch (e) {
+        closeActionModal();
+        showInfoModal('Xóa thất bại', e.message || 'Không thể xóa khách hàng.');
+      }
+    }
+  });
 }
 
 window.saveCustomer = async function () {
@@ -416,27 +540,44 @@ window.saveCustomer = async function () {
   const pw = document.getElementById('customerPassword').value;
   const status = document.getElementById('customerStatus').value;
 
-  if (!name || !phone) return alert("Vui lòng điền họ tên và số điện thoại.");
-  if (!id && !pw) return alert("Tài khoản mới phải cấp mật khẩu (mặc định 123456)");
-
-  try {
-    if (id) {
-      await apiRequest(`/customers/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ name, phone, password: pw, status: status })
-      });
-    } else {
-      await apiRequest('/customers', {
-        method: 'POST',
-        body: JSON.stringify({ name, phone, password: pw })
-      });
-    }
-    alert("Lưu khách hàng thành công!");
-    closeModal('customerModalOverlay');
-    loadCustomers();
-  } catch (e) {
-    alert("Có lỗi xảy ra: " + e.message);
+  if (!name || !phone) {
+    showInfoModal('Thiếu thông tin', 'Vui lòng nhập đầy đủ họ tên và số điện thoại.');
+    return;
   }
+  if (!id && !pw) {
+    showInfoModal('Thiếu mật khẩu', 'Tài khoản mới cần có mật khẩu khởi tạo.');
+    return;
+  }
+
+  const isEdit = Boolean(id);
+  openActionModal({
+    title: isEdit ? 'Lưu thay đổi khách hàng' : 'Tạo khách hàng mới',
+    message: isEdit ? 'Xác nhận cập nhật thông tin khách hàng này?' : 'Xác nhận tạo tài khoản khách hàng mới?',
+    confirmText: isEdit ? 'Lưu thay đổi' : 'Tạo tài khoản',
+    onConfirm: async () => {
+      try {
+        if (id) {
+          await apiRequest(`/customers/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ name, phone, password: pw, status: status })
+          });
+        } else {
+          await apiRequest('/customers', {
+            method: 'POST',
+            body: JSON.stringify({ name, phone, password: pw })
+          });
+        }
+        closeModal('customerModalOverlay');
+        closeActionModal();
+        await loadCustomers();
+        await loadDashboard();
+        showInfoModal('Lưu thành công', 'Thông tin khách hàng đã được cập nhật.');
+      } catch (e) {
+        closeActionModal();
+        showInfoModal('Lưu thất bại', e.message || 'Có lỗi xảy ra khi lưu khách hàng.');
+      }
+    }
+  });
 }
 
 // Hàm tìm kiếm khách hàng bằng input
@@ -518,11 +659,23 @@ window.openServiceModal = function (id = null) {
 }
 
 window.deleteService = async function (id) {
-  if (!confirm('Xác nhận xóa món này khỏi hệ thống?')) return;
-  try {
-    await apiRequest(`/menu/${id}`, { method: 'DELETE' });
-    loadServices();
-  } catch (e) { alert('Lỗi: ' + e.message); }
+  openActionModal({
+    title: 'Xóa dịch vụ',
+    message: 'Bạn chắc chắn muốn xóa dịch vụ/món này khỏi hệ thống?',
+    confirmText: 'Xóa',
+    confirmClass: 'btn-danger',
+    onConfirm: async () => {
+      try {
+        await apiRequest(`/menu/${id}`, { method: 'DELETE' });
+        closeActionModal();
+        await loadServices();
+        showInfoModal('Đã xóa dịch vụ', 'Dịch vụ đã được xóa thành công.');
+      } catch (e) {
+        closeActionModal();
+        showInfoModal('Xóa thất bại', e.message || 'Không thể xóa dịch vụ này.');
+      }
+    }
+  });
 }
 
 window.saveService = async function () {
@@ -530,23 +683,39 @@ window.saveService = async function () {
   const name = document.getElementById('serviceName').value;
   const type = document.getElementById('serviceType').value;
   const price = document.getElementById('servicePrice').value;
-  if (!name || !price) return alert("Vui lòng nhập đầy đủ tên và giá");
+  if (!name || !price) {
+    showInfoModal('Thiếu thông tin', 'Vui lòng nhập đầy đủ tên dịch vụ và giá.');
+    return;
+  }
 
-  try {
-    if (id) {
-      await apiRequest(`/menu/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ name, type, price: parseFloat(price) })
-      });
-    } else {
-      await apiRequest('/menu', {
-        method: 'POST',
-        body: JSON.stringify({ name, type, price: parseFloat(price), status: 'AVAILABLE' })
-      });
+  const isEdit = Boolean(id);
+  openActionModal({
+    title: isEdit ? 'Cập nhật dịch vụ' : 'Tạo dịch vụ mới',
+    message: isEdit ? 'Xác nhận lưu thay đổi cho dịch vụ này?' : 'Xác nhận thêm dịch vụ mới vào menu?',
+    confirmText: isEdit ? 'Lưu thay đổi' : 'Thêm dịch vụ',
+    onConfirm: async () => {
+      try {
+        if (id) {
+          await apiRequest(`/menu/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ name, type, price: parseFloat(price) })
+          });
+        } else {
+          await apiRequest('/menu', {
+            method: 'POST',
+            body: JSON.stringify({ name, type, price: parseFloat(price), status: 'AVAILABLE' })
+          });
+        }
+        closeModal('serviceModalOverlay');
+        closeActionModal();
+        await loadServices();
+        showInfoModal('Lưu thành công', 'Thông tin dịch vụ đã được cập nhật.');
+      } catch (e) {
+        closeActionModal();
+        showInfoModal('Lưu thất bại', e.message || 'Không thể lưu dịch vụ.');
+      }
     }
-    closeModal('serviceModalOverlay');
-    loadServices();
-  } catch (e) { alert('Lỗi: ' + e.message); }
+  });
 }
 
 // ===== PACKAGES SECTION =====
@@ -601,11 +770,23 @@ window.openPackageModal = function (id = null) {
 }
 
 window.deletePackage = async function (id) {
-  if (!confirm('Xác nhận xóa gói giờ này?')) return;
-  try {
-    await apiRequest(`/packages/${id}`, { method: 'DELETE' });
-    loadPackages();
-  } catch (e) { alert('Lỗi: ' + e.message); }
+  openActionModal({
+    title: 'Xóa gói giờ',
+    message: 'Bạn chắc chắn muốn xóa gói giờ này khỏi hệ thống?',
+    confirmText: 'Xóa',
+    confirmClass: 'btn-danger',
+    onConfirm: async () => {
+      try {
+        await apiRequest(`/packages/${id}`, { method: 'DELETE' });
+        closeActionModal();
+        await loadPackages();
+        showInfoModal('Đã xóa gói giờ', 'Gói giờ đã được xóa thành công.');
+      } catch (e) {
+        closeActionModal();
+        showInfoModal('Xóa thất bại', e.message || 'Không thể xóa gói giờ.');
+      }
+    }
+  });
 }
 
 window.savePackage = async function () {
@@ -613,180 +794,297 @@ window.savePackage = async function () {
   const name = document.getElementById('packageName').value;
   const hours = document.getElementById('packageHours').value;
   const price = document.getElementById('packagePrice').value;
-  if (!name || !hours || !price) return alert("Vui lòng nhập đủ tên, số giờ và giá");
+  if (!name || !hours || !price) {
+    showInfoModal('Thiếu thông tin', 'Vui lòng nhập đủ tên, số giờ và giá của gói giờ.');
+    return;
+  }
 
-  try {
-    if (id) {
-      await apiRequest(`/packages/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ name, hoursAmount: parseFloat(hours), price: parseFloat(price) })
-      });
-    } else {
-      await apiRequest('/packages', {
-        method: 'POST',
-        body: JSON.stringify({ name, hoursAmount: parseFloat(hours), price: parseFloat(price), status: 'AVAILABLE' })
-      });
+  const isEdit = Boolean(id);
+  openActionModal({
+    title: isEdit ? 'Cập nhật gói giờ' : 'Tạo gói giờ mới',
+    message: isEdit ? 'Xác nhận lưu thay đổi cho gói giờ này?' : 'Xác nhận thêm gói giờ mới?',
+    confirmText: isEdit ? 'Lưu thay đổi' : 'Thêm gói giờ',
+    onConfirm: async () => {
+      try {
+        if (id) {
+          await apiRequest(`/packages/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ name, hoursAmount: parseFloat(hours), price: parseFloat(price) })
+          });
+        } else {
+          await apiRequest('/packages', {
+            method: 'POST',
+            body: JSON.stringify({ name, hoursAmount: parseFloat(hours), price: parseFloat(price), status: 'AVAILABLE' })
+          });
+        }
+        closeModal('packageModalOverlay');
+        closeActionModal();
+        await loadPackages();
+        showInfoModal('Lưu thành công', 'Thông tin gói giờ đã được cập nhật.');
+      } catch (e) {
+        closeActionModal();
+        showInfoModal('Lưu thất bại', e.message || 'Không thể lưu gói giờ.');
+      }
     }
-    closeModal('packageModalOverlay');
-    loadPackages();
-  } catch (e) { alert('Lỗi: ' + e.message); }
+  });
 }
 
 // ===== ORDERS (REQUESTS) SECTION =====
 window.loadOrders = async function () {
   try {
     const requests = await apiRequest('/requests');
-    const grid = document.getElementById('ordersGrid');
-
-    // Sort array descending created at
-    requests.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-    let pendingCount = 0;
-    let paidCount = 0;
-    let cancelledCount = 0;
-
-    requests.forEach(r => {
-      if (r.status === 'PENDING') pendingCount++;
-      else if (r.status === 'PAID' || r.status === 'APPROVED') paidCount++;
-      else if (r.status === 'CANCELLED') cancelledCount++;
-    });
-
-    document.getElementById('orderCountAll').innerText = requests.length;
-    document.getElementById('orderCountPending').innerText = pendingCount;
-    document.getElementById('orderCountPaid').innerText = paidCount;
-    document.getElementById('orderCountCancel').innerText = cancelledCount;
-
-    document.getElementById('orderCount').textContent = `Hiển thị lịch sử các order dịch vụ`;
-
-    if (requests.length === 0) {
-      grid.innerHTML = `<div class="orders-empty"><i class="fa-solid fa-bell-slash"></i><p>Chưa có yêu cầu nào trên hệ thống.</p></div>`;
-      return;
-    }
-
-    grid.innerHTML = requests.map(r => {
-      let cardClass = '';
-      if (r.status === 'PENDING') cardClass = 'order-card--pending';
-      else if (r.status === 'APPROVED' || r.status === 'PAID') cardClass = 'order-card--paid';
-      else cardClass = 'order-card--rejected';
-
-      const icon = r.serviceName ? 'fa-mug-hot' : 'fa-ticket';
-      const name = r.serviceName || r.packageName || 'Yêu cầu';
-
-      let statusVietnamese = trans(r.status);
-
-      return `
-        <div class="order-card ${cardClass}" data-status="${r.status}" style="flex-direction:row; align-items:center; padding:12px 16px; flex-wrap:wrap; gap:16px;">
-          <!-- User info -->
-          <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:200px;">
-            <div class="order-card__avatar" style="margin:0;"><i class="fa-solid fa-user"></i></div>
-            <div>
-              <div class="order-card__name">${r.customerName || 'N/A'}</div>
-              <div class="order-card__time" style="margin-top:2px"><i class="fa-regular fa-clock"></i> ${formatDateTime(r.createdAt)}</div>
-            </div>
-          </div>
-          
-          <!-- Service info -->
-          <div style="flex:1.5; display:flex; align-items:center; gap:12px; min-width:250px;">
-             <div style="width:36px; height:36px; border-radius:8px; background:var(--bg-color); display:flex; align-items:center; justify-content:center; color:var(--accent-color); font-size:16px;">
-               <i class="fa-solid ${icon}"></i>
-             </div>
-             <div>
-               <div style="font-weight:600; font-size:14px; color:var(--text-main);">${name} <span style="font-weight:500; color:var(--text-muted);">x${r.quantity}</span></div>
-               <div style="font-weight:700; color:var(--accent-color); font-size:14px; margin-top:2px;">${formatCurrency(r.totalPrice)}</div>
-             </div>
-          </div>
-          
-          <!-- Status -->
-          <div style="width: 120px; text-align:center;">
-             <span class="badge ${r.status === 'PENDING' ? 'badge-warning' : (r.status === 'APPROVED' || r.status === 'PAID' ? 'badge-success' : 'badge-danger')}">
-               ${statusVietnamese}
-             </span>
-          </div>
-
-          <!-- Actions -->
-          <div style="display:flex; gap:8px; justify-content:flex-end; flex:1; min-width:200px;">
-            ${r.status === 'PENDING' ? `
-              ${r.packageName ? `
-                <button class="btn-primary btn-sm" style="padding:6px 12px; background:#16a34a; border-color:#16a34a;" onclick="approveOrder(${r.serviceRequestsId})" title="Duyệt và nạp số giờ của gói này trực tiếp"><i class="fa-solid fa-bolt"></i> Nạp giờ</button>
-              ` : `
-                <button class="btn-primary btn-sm" style="padding:6px 12px;" onclick="approveOrder(${r.serviceRequestsId})" title="Duyệt / Tính Tiền"><i class="fa-solid fa-check"></i> Duyệt</button>
-              `}
-              <button class="btn-danger btn-sm" style="padding:6px 12px; background:#fee2e2; color:#b91c1c;" onclick="cancelOrder(${r.serviceRequestsId})" title="Hủy bỏ request này"><i class="fa-solid fa-xmark"></i> Huỷ</button>
-            ` : ''}
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    // Activate All filter on render
-    const allTabBtn = document.querySelector('.orders-tab-btn');
-    if (allTabBtn) filterOrderList('ALL', allTabBtn);
+    allOrdersCache = requests.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    bindOrderModalEvents();
+    renderOrderCounters();
+    renderOrdersByState();
 
   } catch (err) { console.error(err); }
 };
 
 window.filterOrderList = function (status, btnElement) {
-  // update active tab styling
   document.querySelectorAll('.orders-tab-btn').forEach(b => b.classList.remove('active'));
   if (btnElement) btnElement.classList.add('active');
+  currentOrderFilter = status;
+  currentOrderPage = 1;
+  renderOrdersByState();
+}
 
-  // filtering logic
-  const cards = document.querySelectorAll('.order-card');
-  let emptyState = document.querySelector('.orders-empty');
-  if (emptyState) return;
+window.goToOrderPage = function (page) {
+  const filtered = getFilteredOrders();
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ORDERS_PAGE_SIZE));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  currentOrderPage = safePage;
+  renderOrdersByState();
+}
 
-  cards.forEach(card => {
-    let cardStatus = card.getAttribute('data-status');
-    if (status === 'ALL') {
-      card.style.display = 'flex';
-    } else {
-      if (status === 'PENDING' && cardStatus === 'PENDING') {
-        card.style.display = 'flex';
-      }
-      else if (status === 'PAID' && (cardStatus === 'PAID' || cardStatus === 'APPROVED')) {
-        card.style.display = 'flex';
-      }
-      else if (status === 'CANCELLED' && cardStatus === 'CANCELLED') {
-        card.style.display = 'flex';
-      }
-      else {
-        card.style.display = 'none';
+function renderOrderCounters() {
+  const pendingCount = allOrdersCache.filter(r => r.status === 'PENDING').length;
+  const paidCount = allOrdersCache.filter(r => r.status === 'PAID' || r.status === 'APPROVED').length;
+  const cancelledCount = allOrdersCache.filter(r => r.status === 'CANCELLED').length;
+
+  document.getElementById('orderCountAll').innerText = allOrdersCache.length;
+  document.getElementById('orderCountPending').innerText = pendingCount;
+  document.getElementById('orderCountPaid').innerText = paidCount;
+  document.getElementById('orderCountCancel').innerText = cancelledCount;
+}
+
+function getFilteredOrders() {
+  if (currentOrderFilter === 'ALL') return allOrdersCache;
+  if (currentOrderFilter === 'PENDING') return allOrdersCache.filter(r => r.status === 'PENDING');
+  if (currentOrderFilter === 'PAID') return allOrdersCache.filter(r => r.status === 'PAID' || r.status === 'APPROVED');
+  if (currentOrderFilter === 'CANCELLED') return allOrdersCache.filter(r => r.status === 'CANCELLED');
+  return allOrdersCache;
+}
+
+function renderOrdersByState() {
+  const grid = document.getElementById('ordersGrid');
+  const paging = document.getElementById('ordersPagination');
+  const countEl = document.getElementById('orderCount');
+  if (!grid) return;
+
+  const filtered = getFilteredOrders();
+
+  if (filtered.length === 0) {
+    if (countEl) countEl.textContent = 'Không có yêu cầu nào phù hợp bộ lọc.';
+    grid.innerHTML = `<div class="orders-empty"><i class="fa-solid fa-bell-slash"></i><p>Chưa có yêu cầu nào trên hệ thống.</p></div>`;
+    if (paging) paging.innerHTML = '';
+    return;
+  }
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ORDERS_PAGE_SIZE));
+  currentOrderPage = Math.min(currentOrderPage, totalPages);
+  const start = (currentOrderPage - 1) * ORDERS_PAGE_SIZE;
+  const end = start + ORDERS_PAGE_SIZE;
+  const pageItems = filtered.slice(start, end);
+
+  if (countEl) {
+    countEl.textContent = `Hiển thị ${start + 1}-${Math.min(end, filtered.length)} / ${filtered.length} yêu cầu`;
+  }
+
+  grid.innerHTML = pageItems.map(renderOrderCard).join('');
+  renderOrderPagination(totalPages);
+}
+
+function renderOrderCard(r) {
+  let cardClass = '';
+  if (r.status === 'PENDING') cardClass = 'order-card--pending';
+  else if (r.status === 'APPROVED' || r.status === 'PAID') cardClass = 'order-card--paid';
+  else cardClass = 'order-card--rejected';
+
+  const icon = r.serviceName ? 'fa-mug-hot' : 'fa-ticket';
+  const name = r.serviceName || r.packageName || 'Yêu cầu';
+  const statusClass = r.status === 'PENDING' ? 'badge-warning' : (r.status === 'APPROVED' || r.status === 'PAID' ? 'badge-success' : 'badge-danger');
+
+  return `
+    <div class="order-card ${cardClass}" data-status="${r.status}" onclick="openOrderDetailModal(${r.serviceRequestsId})" style="flex-direction:row; align-items:center; padding:12px 16px; flex-wrap:wrap; gap:16px;">
+      <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:200px;">
+        <div class="order-card__avatar" style="margin:0;"><i class="fa-solid fa-user"></i></div>
+        <div>
+          <div class="order-card__name">${r.customerName || 'N/A'}</div>
+          <div class="order-card__time" style="margin-top:2px"><i class="fa-regular fa-clock"></i> ${formatDateTime(r.createdAt)}</div>
+        </div>
+      </div>
+
+      <div style="flex:1.5; display:flex; align-items:center; gap:12px; min-width:250px;">
+        <div style="width:36px; height:36px; border-radius:8px; background:var(--bg-color); display:flex; align-items:center; justify-content:center; color:var(--accent-color); font-size:16px;">
+          <i class="fa-solid ${icon}"></i>
+        </div>
+        <div>
+          <div style="font-weight:600; font-size:14px; color:var(--text-main);">${name} <span style="font-weight:500; color:var(--text-muted);">x${r.quantity}</span></div>
+          <div style="font-weight:700; color:var(--accent-color); font-size:14px; margin-top:2px;">${formatCurrency(r.totalPrice)}</div>
+        </div>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:10px; margin-left:auto;">
+        <span class="badge ${statusClass}">${trans(r.status)}</span>
+        <button class="btn-secondary btn-sm" onclick="event.stopPropagation(); openOrderDetailModal(${r.serviceRequestsId})">
+          <i class="fa-solid fa-up-right-from-square"></i> Chi tiết
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function renderOrderPagination(totalPages) {
+  const paging = document.getElementById('ordersPagination');
+  if (!paging) return;
+
+  const maxPagesToShow = 5;
+  let startPage = Math.max(1, currentOrderPage - 2);
+  let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+  if (endPage - startPage + 1 < maxPagesToShow) {
+    startPage = Math.max(1, endPage - maxPagesToShow + 1);
+  }
+
+  const pageButtons = [];
+  for (let p = startPage; p <= endPage; p += 1) {
+    pageButtons.push(`<button class="orders-page-btn ${p === currentOrderPage ? 'active' : ''}" onclick="goToOrderPage(${p})">${p}</button>`);
+  }
+
+  paging.innerHTML = `
+    <span style="font-size:12px;color:var(--text-muted);margin-right:6px">Trang ${currentOrderPage}/${totalPages}</span>
+    <button class="orders-page-btn" ${currentOrderPage === 1 ? 'disabled' : ''} onclick="goToOrderPage(${currentOrderPage - 1})">
+      <i class="fa-solid fa-chevron-left"></i>
+    </button>
+    ${pageButtons.join('')}
+    <button class="orders-page-btn" ${currentOrderPage === totalPages ? 'disabled' : ''} onclick="goToOrderPage(${currentOrderPage + 1})">
+      <i class="fa-solid fa-chevron-right"></i>
+    </button>
+  `;
+}
+
+window.openOrderDetailModal = function (id) {
+  const order = allOrdersCache.find(r => r.serviceRequestsId === id);
+  if (!order) return;
+  currentOrderModalId = id;
+
+  const overlay = document.getElementById('orderDetailModalOverlay');
+  const body = document.getElementById('orderDetailModalBody');
+  const footer = document.getElementById('orderDetailModalFooter');
+  if (!overlay || !body || !footer) return;
+
+  const typeLabel = order.serviceName ? 'Dịch vụ' : 'Gói giờ';
+  const serviceLabel = order.serviceName || order.packageName || 'Yêu cầu';
+
+  body.innerHTML = `
+    <div class="order-detail-row"><div class="order-detail-label">Khách hàng</div><div class="order-detail-value">${order.customerName || 'N/A'}</div></div>
+    <div class="order-detail-row"><div class="order-detail-label">Thời gian gửi</div><div class="order-detail-value">${formatDateTime(order.createdAt)}</div></div>
+    <div class="order-detail-row"><div class="order-detail-label">Loại yêu cầu</div><div class="order-detail-value">${typeLabel}</div></div>
+    <div class="order-detail-row"><div class="order-detail-label">Nội dung</div><div class="order-detail-value">${serviceLabel}</div></div>
+    <div class="order-detail-row"><div class="order-detail-label">Số lượng</div><div class="order-detail-value">x${order.quantity || 1}</div></div>
+    <div class="order-detail-row"><div class="order-detail-label">Tổng tiền</div><div class="order-detail-value" style="color:var(--accent-color)">${formatCurrency(order.totalPrice)}</div></div>
+    <div class="order-detail-row"><div class="order-detail-label">Trạng thái</div><div class="order-detail-value"><span class="badge ${order.status === 'PENDING' ? 'badge-warning' : (order.status === 'APPROVED' || order.status === 'PAID' ? 'badge-success' : 'badge-danger')}">${trans(order.status)}</span></div></div>
+    ${order.note ? `<div class="order-detail-row"><div class="order-detail-label">Ghi chú</div><div class="order-detail-value">${order.note}</div></div>` : ''}
+  `;
+
+  if (order.status === 'PENDING') {
+    footer.style.display = 'flex';
+    footer.innerHTML = `
+      <button type="button" class="btn-danger" style="background:#fee2e2;color:#991b1b;border:1px solid #fecaca" onclick="cancelOrder(${order.serviceRequestsId})"><i class="fa-solid fa-xmark"></i> Từ chối</button>
+      <button type="button" class="btn-primary" onclick="approveOrder(${order.serviceRequestsId})"><i class="fa-solid fa-check"></i> Duyệt yêu cầu</button>
+    `;
+  } else {
+    footer.style.display = 'none';
+    footer.innerHTML = '';
+  }
+
+  overlay.classList.remove('hidden');
+};
+
+window.closeOrderDetailModal = function () {
+  currentOrderModalId = null;
+  document.getElementById('orderDetailModalOverlay')?.classList.add('hidden');
+}
+
+function bindOrderModalEvents() {
+  const overlay = document.getElementById('orderDetailModalOverlay');
+  if (!overlay || overlay.dataset.bound === '1') return;
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target.id === 'orderDetailModalOverlay') closeOrderDetailModal();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !overlay.classList.contains('hidden')) closeOrderDetailModal();
+  });
+
+  overlay.dataset.bound = '1';
+}
+
+window.approveOrder = async function (id) {
+  openActionModal({
+    title: 'Duyệt yêu cầu',
+    message: 'Xác nhận duyệt yêu cầu này và ghi nhận giao dịch thanh toán?',
+    confirmText: 'Duyệt yêu cầu',
+    onConfirm: async () => {
+      try {
+        const resp = await apiRequest(`/requests/${id}/approve`, { method: 'PATCH' });
+
+        if (resp && resp.totalPrice > 0) {
+          await apiRequest('/payments', {
+            method: 'POST',
+            body: JSON.stringify({
+              serviceRequestsId: id,
+              amount: resp.totalPrice,
+              paymentMethod: 'CASH'
+            })
+          });
+        }
+
+        closeOrderDetailModal();
+        closeActionModal();
+        await loadOrders();
+        await loadDashboard();
+        if (document.getElementById('section-reports')?.classList.contains('active')) await loadReports();
+        showInfoModal('Duyệt thành công', 'Yêu cầu đã được duyệt và cập nhật trạng thái.');
+      } catch (e) {
+        closeActionModal();
+        showInfoModal('Duyệt thất bại', e.message || 'Không thể duyệt yêu cầu.');
       }
     }
   });
 }
 
-window.approveOrder = async function (id) {
-  if (confirm('Xác nhận đã thanh toán? Mọi giao dịch sẽ được ghi nhận. Hệ thống đang tính toán...')) {
-    try {
-      const resp = await apiRequest(`/requests/${id}/approve`, { method: 'PATCH' });
-
-      // Nếu có giá tiền > 0, tự động ghi nhận doanh thu vào bảng Payment
-      if (resp && resp.request && resp.request.totalPrice > 0) {
-        await apiRequest('/payments', {
-          method: 'POST',
-          body: JSON.stringify({
-            serviceRequestsId: id,
-            amount: resp.request.totalPrice,
-            paymentMethod: 'CASH'
-          })
-        });
-      }
-
-      loadOrders();
-      loadDashboard();
-      if (document.getElementById('section-reports')?.classList.contains('active')) loadReports();
-    } catch (e) { alert(e.message); }
-  }
-}
-
 window.cancelOrder = async function (id) {
-  if (confirm('Xác nhận từ chối/hủy yêu cầu? Khách hàng sẽ không bị trừ tiền.')) {
-    try {
-      await apiRequest(`/requests/${id}/cancel`, { method: 'PATCH' });
-      loadOrders();
-    } catch (e) { alert(e.message); }
-  }
+  openActionModal({
+    title: 'Từ chối yêu cầu',
+    message: 'Bạn chắc chắn muốn từ chối/hủy yêu cầu này?',
+    confirmText: 'Từ chối',
+    confirmClass: 'btn-danger',
+    onConfirm: async () => {
+      try {
+        await apiRequest(`/requests/${id}/cancel`, { method: 'PATCH' });
+        closeOrderDetailModal();
+        closeActionModal();
+        await loadOrders();
+        await loadDashboard();
+        showInfoModal('Đã từ chối yêu cầu', 'Yêu cầu đã được chuyển sang trạng thái hủy.');
+      } catch (e) {
+        closeActionModal();
+        showInfoModal('Từ chối thất bại', e.message || 'Không thể từ chối yêu cầu.');
+      }
+    }
+  });
 }
 
 // ===== REPORTS SECTION =====

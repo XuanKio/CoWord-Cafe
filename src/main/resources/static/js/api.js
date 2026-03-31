@@ -53,7 +53,7 @@ export async function apiRequest(endpoint, options = {}) {
 
     try {
       const err = await response.json();
-      errMsg = err.message || err.error || errMsg;
+      errMsg = err.message || err.error || (err.data && err.data.message) || errMsg;
     } catch {
       const text = await response.text();
       if (text) errMsg = text;
@@ -73,7 +73,20 @@ export async function apiRequest(endpoint, options = {}) {
 
   const contentType = response.headers.get('content-type') || '';
   if (contentType.includes('application/json')) {
-    return response.json();
+    const payload = await response.json();
+
+    if (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'success')) {
+      if (payload.success === false) {
+        const error = new Error(payload.message || 'Yeu cau that bai');
+        error.status = response.status;
+        throw error;
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, 'data')) {
+        return payload.data;
+      }
+    }
+
+    return payload;
   }
   return response.text();
 }
@@ -220,7 +233,7 @@ export const packageSaleApi = {
   },
   create: async (data) => {
     const created = await serviceOrderApi.createPackageRequest(data);
-    const requestId = created?.request?.serviceRequestsId ?? created?.serviceRequestsId;
+    const requestId = created?.serviceRequestsId;
     if (!requestId) throw new Error('Không tạo được yêu cầu mua gói');
 
     await serviceOrderApi.updateStatus(requestId, 'serving');

@@ -284,8 +284,8 @@ window.submitOrder = async function () {
     else { body.servicesId = id; if (activeSessionId) body.sessionsId = activeSessionId; }
 
     try {
-      const data = await serviceRequestApi.create(body);
-      if (data.success) ok++; else fail++;
+      await serviceRequestApi.create(body);
+      ok++;
     } catch { fail++; }
   }
 
