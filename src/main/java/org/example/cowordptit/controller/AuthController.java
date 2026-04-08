@@ -3,7 +3,6 @@ package org.example.cowordptit.controller;
 import org.example.cowordptit.dto.request.AdminLoginRequest;
 import org.example.cowordptit.dto.request.UserLoginRequest;
 import org.example.cowordptit.dto.response.ApiResponse;
-import lombok.RequiredArgsConstructor;
 import org.example.cowordptit.service.AuthService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,10 +16,13 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/auth")
-@RequiredArgsConstructor
 public class AuthController {
 
     private final AuthService authService;
+
+    public AuthController(AuthService authService) {
+        this.authService = authService;
+    }
 
     // ===== ADMIN LOGIN =====
     @PostMapping("/admin")
