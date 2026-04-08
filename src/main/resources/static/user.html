@@ -44,36 +44,56 @@
       </div>
 
       <!-- Thông tin tài khoản -->
-      <div class="user-card" style="margin-bottom:20px">
-        <div class="section-header" style="margin-bottom:12px">
+      <div class="user-card user-account-card">
+        <div class="section-header user-account-header">
           <h3><i class="fa-solid fa-id-card"></i> Thông tin tài khoản</h3>
         </div>
         <div id="userInfoPanel">
-          <div style="color:var(--text-muted)"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</div>
+          <div class="user-loading"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</div>
         </div>
       </div>
 
-      <div class="dashboard-grid">
+      <section class="user-card">
+        <div class="section-header" style="margin-bottom:14px">
+          <h3><i class="fa-solid fa-compass"></i> Khu vực thao tác nhanh</h3>
+        </div>
 
-        <!-- Cột trái: Lịch sử phiên -->
-        <section class="user-card">
-          <div class="section-header">
-            <h3><i class="fa-solid fa-calendar-check"></i> Lịch sử phiên</h3>
-          </div>
-          <div id="myBookingsList" class="bookings-list"></div>
-        </section>
+        <div id="userMainTabs" class="user-main-tabs">
+          <button class="user-main-tab-btn active" data-tab="sessions"><i class="fa-solid fa-calendar-check"></i> Lịch sử phiên</button>
+          <button class="user-main-tab-btn" data-tab="packages"><i class="fa-solid fa-box-open"></i> Gói nạp</button>
+          <button class="user-main-tab-btn" data-tab="drinks"><i class="fa-solid fa-mug-saucer"></i> Đồ uống</button>
+          <button class="user-main-tab-btn" data-tab="foods"><i class="fa-solid fa-burger"></i> Đồ ăn</button>
+        </div>
 
-        <!-- Cột phải: Đặt hàng (gói + dịch vụ chung) -->
-        <section class="user-card">
-          <div class="section-header">
-            <h3><i class="fa-solid fa-basket-shopping"></i> Đặt hàng</h3>
+        <div id="userMainTabPanels">
+          <div id="tabPanel-sessions" class="user-main-tab-panel">
+            <div id="myBookingsList" class="bookings-list"></div>
+            <div class="list-pagination" id="sessionsPagination"></div>
           </div>
-          <div id="orderPanel">
-            <div style="color:var(--text-muted)"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</div>
-          </div>
-        </section>
 
-      </div><!-- end dashboard-grid -->
+          <div id="tabPanel-packages" class="user-main-tab-panel" style="display:none">
+            <div id="orderPackagesList" class="order-items-grid"></div>
+            <div class="list-pagination" id="packagesPagination"></div>
+          </div>
+
+          <div id="tabPanel-drinks" class="user-main-tab-panel" style="display:none">
+            <div id="orderDrinksList" class="order-items-grid"></div>
+            <div class="list-pagination" id="drinksPagination"></div>
+          </div>
+
+          <div id="tabPanel-foods" class="user-main-tab-panel" style="display:none">
+            <div id="orderFoodsList" class="order-items-grid"></div>
+            <div class="list-pagination" id="foodsPagination"></div>
+          </div>
+        </div>
+
+        <div id="orderFooter" class="order-footer" style="display:none">
+          <div id="orderTotal" class="order-total">Chưa chọn gì</div>
+          <button id="btnSubmitOrder" class="btn-primary" onclick="submitOrder()" disabled>
+            <i class="fa-solid fa-paper-plane"></i> Gửi yêu cầu
+          </button>
+        </div>
+      </section>
 
     </div><!-- end dashboardSection -->
 

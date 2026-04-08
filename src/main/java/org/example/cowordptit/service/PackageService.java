@@ -1,6 +1,5 @@
 package org.example.cowordptit.service;
 
-import lombok.RequiredArgsConstructor;
 import org.example.cowordptit.entity.TimePackage;
 import org.example.cowordptit.repository.PackageRepository;
 import org.springframework.stereotype.Service;
@@ -12,10 +11,13 @@ import java.util.Map;
 import java.util.Optional;
 
 @Service
-@RequiredArgsConstructor
 public class PackageService {
 
     private final PackageRepository packageRepository;
+
+    public PackageService(PackageRepository packageRepository) {
+        this.packageRepository = packageRepository;
+    }
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getAll() {

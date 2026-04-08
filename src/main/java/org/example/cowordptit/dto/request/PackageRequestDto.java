@@ -39,4 +39,5 @@ public class PackageRequestDto {
     public void setPrice(BigDecimal price) {
         this.price = price;
     }
+
 }

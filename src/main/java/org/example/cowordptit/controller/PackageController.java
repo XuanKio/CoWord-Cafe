@@ -1,6 +1,5 @@
 package org.example.cowordptit.controller;
 
-import lombok.RequiredArgsConstructor;
 import org.example.cowordptit.dto.request.PackageRequestDto;
 import org.example.cowordptit.dto.response.ApiResponse;
 import org.example.cowordptit.service.PackageService;
@@ -22,10 +21,13 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/packages")
-@RequiredArgsConstructor
 public class PackageController {
 
     private final PackageService packageService;
+
+    public PackageController(PackageService packageService) {
+        this.packageService = packageService;
+    }
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getAll() {

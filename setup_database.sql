@@ -43,6 +43,7 @@ USE coworking_cafe;
 --     name VARCHAR(100) NOT NULL,
 --     hours_amount DECIMAL(10,2) NOT NULL,
 --     price DECIMAL(12,2) NOT NULL,
+--     hot BOOLEAN NOT NULL DEFAULT FALSE,
 --     status ENUM('AVAILABLE','DISABLED') DEFAULT 'AVAILABLE'
 -- );
 

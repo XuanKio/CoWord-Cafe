@@ -25,7 +25,6 @@ public class DataInitializer {
             // ===== ADMIN =====
             if (adminRepository.count() == 0) {
                 Admin admin = new Admin();
-                admin.setAdminId(1);
                 admin.setUsername("admin");
                 admin.setPhone("0900000000");
                 admin.setPasswordHash("admin123");

@@ -1,9 +1,6 @@
 package org.example.cowordptit.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 
@@ -13,9 +10,6 @@ import java.math.BigDecimal;
  */
 @Entity
 @jakarta.persistence.Table(name = "Packages")
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
 public class TimePackage {
 
     @Id
@@ -40,5 +34,57 @@ public class TimePackage {
 
     public enum PackageStatus {
         AVAILABLE, DISABLED
+    }
+
+    public TimePackage() {
+    }
+
+    public TimePackage(Long packagesId, String name, BigDecimal hoursAmount, BigDecimal price,
+            PackageStatus status) {
+        this.packagesId = packagesId;
+        this.name = name;
+        this.hoursAmount = hoursAmount;
+        this.price = price;
+        this.status = status;
+    }
+
+    public Long getPackagesId() {
+        return packagesId;
+    }
+
+    public void setPackagesId(Long packagesId) {
+        this.packagesId = packagesId;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public BigDecimal getHoursAmount() {
+        return hoursAmount;
+    }
+
+    public void setHoursAmount(BigDecimal hoursAmount) {
+        this.hoursAmount = hoursAmount;
+    }
+
+    public BigDecimal getPrice() {
+        return price;
+    }
+
+    public void setPrice(BigDecimal price) {
+        this.price = price;
+    }
+
+    public PackageStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(PackageStatus status) {
+        this.status = status;
     }
 }

@@ -1,9 +1,6 @@
 package org.example.cowordptit.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -14,9 +11,6 @@ import java.time.LocalDateTime;
  */
 @Entity
 @jakarta.persistence.Table(name = "Users")
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
 public class Customer {
 
     @Id
@@ -51,5 +45,75 @@ public class Customer {
         INACTIVE,
         IN_SESSION,
         OUT_OF_HOURS
+    }
+
+    public Customer() {
+    }
+
+    public Customer(Long usersId, String name, String phone, String passwordHash, BigDecimal remainingHours,
+            CustomerStatus status, LocalDateTime createdAt) {
+        this.usersId = usersId;
+        this.name = name;
+        this.phone = phone;
+        this.passwordHash = passwordHash;
+        this.remainingHours = remainingHours;
+        this.status = status;
+        this.createdAt = createdAt;
+    }
+
+    public Long getUsersId() {
+        return usersId;
+    }
+
+    public void setUsersId(Long usersId) {
+        this.usersId = usersId;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
+    public BigDecimal getRemainingHours() {
+        return remainingHours;
+    }
+
+    public void setRemainingHours(BigDecimal remainingHours) {
+        this.remainingHours = remainingHours;
+    }
+
+    public CustomerStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(CustomerStatus status) {
+        this.status = status;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
     }
 }

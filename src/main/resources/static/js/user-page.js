@@ -10,6 +10,17 @@ const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 const welcomeName = document.getElementById('welcomeName');
 const dashboardSection = document.getElementById('dashboardSection');
 const btnLogout = document.getElementById('btnLogout');
+const PAGE_SIZE = {
+  sessions: 5,
+  items: 8,
+};
+
+let currentTab = 'sessions';
+let sessionsCache = [];
+let currentSessionPage = 1;
+let currentPackagePage = 1;
+let currentDrinkPage = 1;
+let currentFoodPage = 1;
 
 // ===== Khởi tạo =====
 function init() {
@@ -22,9 +33,10 @@ function init() {
   if (btnLogout) btnLogout.style.display = 'inline-flex';
   if (welcomeName) welcomeName.textContent = currentUser.name || 'Khách';
 
+  bindMainTabs();
   loadMyInfo();
   loadMySessions();
-  loadOrderPanel();   // gộp gói + dịch vụ
+  loadOrderPanel();
 }
 
 // ===== Đăng xuất =====
@@ -68,21 +80,21 @@ function renderUserInfo(data) {
   const panel = document.getElementById('userInfoPanel');
   if (!panel) return;
   panel.innerHTML = `
-    <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:center">
-      <div>
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:2px">Họ tên</div>
-        <div style="font-weight:700">${data.name}</div>
+    <div class="user-info-grid">
+      <div class="user-info-item">
+        <div class="user-info-label">Họ tên</div>
+        <div class="user-info-value">${data.name}</div>
       </div>
-      <div>
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:2px">Điện thoại</div>
-        <div style="font-weight:600">${data.phone}</div>
+      <div class="user-info-item">
+        <div class="user-info-label">Điện thoại</div>
+        <div class="user-info-value">${data.phone}</div>
       </div>
-      <div>
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:2px">Giờ còn lại</div>
-        <div style="font-weight:800;font-size:22px;color:var(--primary-color)">${Number(data.remainingHours).toFixed(2)}<span style="font-size:14px;font-weight:400">h</span></div>
+      <div class="user-info-item user-info-hours">
+        <div class="user-info-label">Giờ còn lại</div>
+        <div class="user-hours-value">${Number(data.remainingHours).toFixed(2)}<span>h</span></div>
       </div>
-      <div>
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">Trạng thái</div>
+      <div class="user-info-item">
+        <div class="user-info-label">Trạng thái</div>
         <span class="badge ${s.cls}">${s.label}</span>
       </div>
     </div>`;
@@ -96,16 +108,32 @@ async function loadMySessions() {
 
   try {
     const sessions = await sessionApi.getByCustomer(currentUser.usersId);
-
-    if (!sessions || sessions.length === 0) {
-      container.innerHTML = '<div class="empty-state"><i class="fa-solid fa-calendar-xmark"></i><p>Bạn chưa có phiên nào</p></div>';
-      return;
-    }
-    sessions.sort((a, b) => new Date(b.checkIn) - new Date(a.checkIn));
-    container.innerHTML = sessions.map(renderSessionCard).join('');
+    sessionsCache = (sessions || []).sort((a, b) => new Date(b.checkIn) - new Date(a.checkIn));
+    currentSessionPage = 1;
+    renderSessionList();
   } catch (e) {
     container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i><p>${e.message}</p></div>`;
   }
+}
+
+function renderSessionList() {
+  const container = document.getElementById('myBookingsList');
+  const pagination = document.getElementById('sessionsPagination');
+  if (!container || !pagination) return;
+
+  if (sessionsCache.length === 0) {
+    container.innerHTML = '<div class="empty-state"><i class="fa-solid fa-calendar-xmark"></i><p>Bạn chưa có phiên nào</p></div>';
+    pagination.innerHTML = '';
+    return;
+  }
+
+  const totalPages = Math.max(1, Math.ceil(sessionsCache.length / PAGE_SIZE.sessions));
+  currentSessionPage = Math.max(1, Math.min(currentSessionPage, totalPages));
+  const start = (currentSessionPage - 1) * PAGE_SIZE.sessions;
+  const pageRows = sessionsCache.slice(start, start + PAGE_SIZE.sessions);
+
+  container.innerHTML = pageRows.map(renderSessionCard).join('');
+  renderPagination(pagination, totalPages, currentSessionPage, 'gotoSessionPage');
 }
 
 function renderSessionCard(s) {
@@ -136,104 +164,218 @@ function renderSessionCard(s) {
 let allPackages = [];
 let allServices = [];
 let activeSessionId = null;
-const cart = {};   // key: "pkg_<id>" hoặc "svc_<id>", value: số lượng
+const cart = {};
 
 async function loadOrderPanel() {
-  const panel = document.getElementById('orderPanel');
-  if (!panel || !currentUser.usersId) return;
-  panel.innerHTML = '<div style="color:var(--text-muted)"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</div>';
+  if (!currentUser.usersId) return;
 
   try {
-    // Lấy session đang active
     const sessions = await sessionApi.getByCustomer(currentUser.usersId);
-    const ongoing = sessions.find(s => s.status === 'ONGOING');
+    const ongoing = sessions.find((s) => s.status === 'ONGOING');
     activeSessionId = ongoing ? ongoing.sessionsId : null;
 
-    // Gói giờ + dịch vụ song song
     const [packages, services] = await Promise.all([
       packageApi.getAll(),
-      menuApi.getAll()
+      menuApi.getAll(),
     ]);
-    allPackages = packages;
-    allServices = services;
+    allPackages = packages || [];
+    allServices = services || [];
 
-    renderOrderPanel(panel);
+    currentPackagePage = 1;
+    currentDrinkPage = 1;
+    currentFoodPage = 1;
+
+    renderCurrentTab();
+    updateOrderSummary();
   } catch (e) {
-    panel.innerHTML = `<div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i><p>Không thể tải: ${e.message}</p></div>`;
+    const targets = ['orderPackagesList', 'orderDrinksList', 'orderFoodsList'];
+    targets.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = `<div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i><p>Không thể tải: ${e.message}</p></div>`;
+    });
   }
 }
 
-function renderOrderPanel(panel) {
-  const noteHtml = activeSessionId
-    ? ''
-    : `<div class="alert alert-error" style="display:flex;margin-bottom:16px">
-         <i class="fa-solid fa-circle-exclamation"></i>
-         Bạn chưa check-in — chỉ có thể đặt gói giờ khi chưa ngồi, hoặc nhờ nhân viên check-in để gọi đồ.
-       </div>`;
-
-  // --- Gói giờ ---
-  const pkgHtml = allPackages.length === 0 ? ''
-    : `<div style="margin-bottom:20px">
-         <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Gói giờ</div>
-         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px">
-           ${allPackages.map(p => `
-             <div style="border:1px solid var(--border-color);border-radius:10px;padding:14px;background:var(--bg-color)">
-               <div style="font-weight:700;font-size:14px;margin-bottom:4px">${p.name}</div>
-               <div style="font-weight:800;color:var(--primary-color);font-size:16px;margin-bottom:2px">${formatCurrency(p.price)}</div>
-               <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">${p.hoursAmount}h</div>
-               ${renderQtyRow('pkg_' + p.packagesId)}
-             </div>
-           `).join('')}
-         </div>
-       </div>`;
-
-  // --- Dịch vụ (chỉ hiện khi đang trong phiên) ---
-  const drinks = allServices.filter(m => m.type === 'DRINK');
-  const foods = allServices.filter(m => m.type === 'FOOD');
-  const svcHtml = (!activeSessionId || allServices.length === 0) ? ''
-    : `<div>
-         <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Đồ ăn / uống</div>
-         ${drinks.length ? renderMenuGroup('fa-mug-saucer', 'Đồ uống', drinks) : ''}
-         ${foods.length ? renderMenuGroup('fa-burger', 'Đồ ăn', foods) : ''}
-       </div>`;
-
-  panel.innerHTML = `
-    ${noteHtml}
-    ${pkgHtml}
-    ${svcHtml || (activeSessionId && allServices.length === 0 ? '<p style="color:var(--text-muted);font-size:13px">Chưa có món nào trong menu.</p>' : '')}
-    <div style="border-top:1px solid var(--border-color);padding-top:14px;margin-top:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
-      <div id="orderTotal" style="font-size:14px;color:var(--text-muted)">Chưa chọn gì</div>
-      <button id="btnSubmitOrder" class="btn-primary" onclick="submitOrder()" disabled>
-        <i class="fa-solid fa-paper-plane"></i> Gửi yêu cầu
-      </button>
-    </div>`;
+function bindMainTabs() {
+  const tabs = document.querySelectorAll('.user-main-tab-btn[data-tab]');
+  tabs.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.tab;
+      if (!tab) return;
+      switchMainTab(tab);
+    });
+  });
+  switchMainTab('sessions');
 }
 
-function renderMenuGroup(icon, label, items) {
+function switchMainTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.user-main-tab-btn[data-tab]').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
+
+  const panelIds = ['sessions', 'packages', 'drinks', 'foods'];
+  panelIds.forEach((panel) => {
+    const el = document.getElementById(`tabPanel-${panel}`);
+    if (!el) return;
+    el.style.display = panel === tab ? '' : 'none';
+  });
+
+  const orderFooter = document.getElementById('orderFooter');
+  if (orderFooter) {
+    orderFooter.style.display = tab === 'sessions' ? 'none' : 'flex';
+  }
+
+  renderCurrentTab();
+}
+
+function renderCurrentTab() {
+  if (currentTab === 'sessions') {
+    renderSessionList();
+    return;
+  }
+
+  if (currentTab === 'packages') {
+    renderPackagesList();
+    return;
+  }
+
+  if (currentTab === 'drinks') {
+    renderServiceList('DRINK');
+    return;
+  }
+
+  renderServiceList('FOOD');
+}
+
+function renderPackagesList() {
+  const container = document.getElementById('orderPackagesList');
+  const pagination = document.getElementById('packagesPagination');
+  if (!container || !pagination) return;
+
+  if (allPackages.length === 0) {
+    container.innerHTML = '<div class="empty-state"><i class="fa-solid fa-box-open"></i><p>Chưa có gói nạp nào.</p></div>';
+    pagination.innerHTML = '';
+    return;
+  }
+
+  const totalPages = Math.max(1, Math.ceil(allPackages.length / PAGE_SIZE.items));
+  currentPackagePage = Math.max(1, Math.min(currentPackagePage, totalPages));
+  const start = (currentPackagePage - 1) * PAGE_SIZE.items;
+  const rows = allPackages.slice(start, start + PAGE_SIZE.items);
+
+  container.innerHTML = rows.map((p) => renderOrderItemCard({
+    key: `pkg_${p.packagesId}`,
+    name: p.name,
+    price: p.price,
+    subtitle: `${p.hoursAmount}h`,
+  })).join('');
+
+  renderPagination(pagination, totalPages, currentPackagePage, 'gotoPackagesPage');
+}
+
+function renderServiceList(type) {
+  const isDrink = type === 'DRINK';
+  const container = document.getElementById(isDrink ? 'orderDrinksList' : 'orderFoodsList');
+  const pagination = document.getElementById(isDrink ? 'drinksPagination' : 'foodsPagination');
+  if (!container || !pagination) return;
+
+  if (!activeSessionId) {
+    container.innerHTML = '<div class="empty-state"><i class="fa-solid fa-circle-exclamation"></i><p>Bạn cần check-in để gọi đồ ăn/uống.</p></div>';
+    pagination.innerHTML = '';
+    return;
+  }
+
+  const rows = allServices.filter((s) => s.type === type);
+  if (rows.length === 0) {
+    container.innerHTML = `<div class="empty-state"><i class="fa-solid ${isDrink ? 'fa-mug-saucer' : 'fa-burger'}"></i><p>Chưa có ${isDrink ? 'đồ uống' : 'đồ ăn'} trong menu.</p></div>`;
+    pagination.innerHTML = '';
+    return;
+  }
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE.items));
+  if (isDrink) currentDrinkPage = Math.max(1, Math.min(currentDrinkPage, totalPages));
+  else currentFoodPage = Math.max(1, Math.min(currentFoodPage, totalPages));
+
+  const currentPage = isDrink ? currentDrinkPage : currentFoodPage;
+  const start = (currentPage - 1) * PAGE_SIZE.items;
+  const pageRows = rows.slice(start, start + PAGE_SIZE.items);
+
+  container.innerHTML = pageRows.map((m) => renderOrderItemCard({
+    key: `svc_${m.servicesId}`,
+    name: m.name,
+    price: m.price,
+    subtitle: isDrink ? 'Đồ uống' : 'Đồ ăn',
+  })).join('');
+
+  renderPagination(pagination, totalPages, currentPage, isDrink ? 'gotoDrinksPage' : 'gotoFoodsPage');
+}
+
+function renderOrderItemCard({ key, name, price, subtitle }) {
   return `
-    <div style="margin-bottom:14px">
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px"><i class="fa-solid ${icon}"></i> ${label}</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px">
-        ${items.map(m => `
-          <div style="border:1px solid var(--border-color);border-radius:8px;padding:12px;background:var(--bg-color)">
-            <div style="font-weight:600;font-size:13px;margin-bottom:2px">${m.name}</div>
-            <div style="font-weight:700;color:var(--primary-color);font-size:13px;margin-bottom:8px">${formatCurrency(m.price)}</div>
-            ${renderQtyRow('svc_' + m.servicesId)}
-          </div>
-        `).join('')}
-      </div>
+    <div class="order-item-card">
+      <div class="order-item-name">${name}</div>
+      <div class="order-item-price">${formatCurrency(price)}</div>
+      <div class="order-item-sub">${subtitle}</div>
+      ${renderQtyRow(key)}
     </div>`;
 }
 
 function renderQtyRow(key) {
   const qty = cart[key] || 0;
   return `
-    <div style="display:flex;align-items:center;gap:8px">
-      <button onclick="changeQty('${key}',-1)" style="width:26px;height:26px;border:1px solid #ccc;border-radius:6px;background:#fff;font-size:15px;cursor:pointer;line-height:1">−</button>
-      <span id="qty-${key}" style="min-width:18px;text-align:center;font-weight:700;font-size:14px">${qty}</span>
-      <button onclick="changeQty('${key}',1)"  style="width:26px;height:26px;border:1px solid #ccc;border-radius:6px;background:#fff;font-size:15px;cursor:pointer;line-height:1">+</button>
+    <div class="qty-row">
+      <button onclick="changeQty('${key}',-1)" class="qty-btn">−</button>
+      <span id="qty-${key}" class="qty-value">${qty}</span>
+      <button onclick="changeQty('${key}',1)" class="qty-btn">+</button>
     </div>`;
 }
+
+function renderPagination(container, totalPages, currentPage, gotoFnName) {
+  if (totalPages <= 1) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const pages = [];
+  for (let page = 1; page <= totalPages; page += 1) {
+    pages.push(`<button class="list-page-btn ${page === currentPage ? 'active' : ''}" onclick="${gotoFnName}(${page})">${page}</button>`);
+  }
+
+  container.innerHTML = `
+    <button class="list-page-btn" onclick="${gotoFnName}(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>
+      <i class="fa-solid fa-chevron-left"></i>
+    </button>
+    ${pages.join('')}
+    <button class="list-page-btn" onclick="${gotoFnName}(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>
+      <i class="fa-solid fa-chevron-right"></i>
+    </button>
+  `;
+}
+
+window.gotoSessionPage = function (page) {
+  const totalPages = Math.max(1, Math.ceil(sessionsCache.length / PAGE_SIZE.sessions));
+  currentSessionPage = Math.max(1, Math.min(page, totalPages));
+  renderSessionList();
+};
+
+window.gotoPackagesPage = function (page) {
+  const totalPages = Math.max(1, Math.ceil(allPackages.length / PAGE_SIZE.items));
+  currentPackagePage = Math.max(1, Math.min(page, totalPages));
+  renderPackagesList();
+};
+
+window.gotoDrinksPage = function (page) {
+  const totalPages = Math.max(1, Math.ceil(allServices.filter((s) => s.type === 'DRINK').length / PAGE_SIZE.items));
+  currentDrinkPage = Math.max(1, Math.min(page, totalPages));
+  renderServiceList('DRINK');
+};
+
+window.gotoFoodsPage = function (page) {
+  const totalPages = Math.max(1, Math.ceil(allServices.filter((s) => s.type === 'FOOD').length / PAGE_SIZE.items));
+  currentFoodPage = Math.max(1, Math.min(page, totalPages));
+  renderServiceList('FOOD');
+};
 
 window.changeQty = function (key, delta) {
   if (!cart[key]) cart[key] = 0;

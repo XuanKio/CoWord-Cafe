@@ -49,6 +49,16 @@ function showSection(sectionId) {
 
 // Global caching mappings
 let allCustomersMap = {};
+let allCustomersCache = [];
+let customerSearchQuery = '';
+let currentCustomerPage = 1;
+const CUSTOMERS_PAGE_SIZE = 10;
+let reportDailyCache = [];
+let currentReportDailyPage = 1;
+let currentReportDetailPage = 1;
+let currentReportSelectedDate = null;
+const REPORT_DAILY_PAGE_SIZE = 10;
+const REPORT_DETAIL_PAGE_SIZE = 8;
 let allServicesMap = {};
 let allPackagesMap = {};
 let allOrdersCache = [];
@@ -412,17 +422,46 @@ window.doCheckOut = async function (sessionId) {
 window.loadCustomers = async function () {
   try {
     const customers = await apiRequest('/customers');
-    const tbody = document.getElementById('customerTbody');
-    document.getElementById('customerCount').textContent = `(${customers.length})`;
-
+    allCustomersCache = customers || [];
+    allCustomersMap = {};
     customers.forEach(c => allCustomersMap[c.usersId] = c);
 
-    if (customers.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-muted)">Chưa có khách.</td></tr>`;
-      return;
-    }
+    renderCustomersTable();
+  } catch (err) { console.error(err); }
+};
 
-    tbody.innerHTML = customers.map(c => `
+function renderCustomersTable() {
+  const tbody = document.getElementById('customerTbody');
+  const countEl = document.getElementById('customerCount');
+  const paginationEl = document.getElementById('customerPagination');
+  if (!tbody || !countEl || !paginationEl) return;
+
+  const query = customerSearchQuery.trim().toLowerCase();
+  const filtered = allCustomersCache.filter(c => {
+    if (!query) return true;
+    const name = String(c.name || '').toLowerCase();
+    const phone = String(c.phone || '').toLowerCase();
+    return name.includes(query) || phone.includes(query);
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / CUSTOMERS_PAGE_SIZE));
+  currentCustomerPage = Math.min(currentCustomerPage, totalPages);
+  currentCustomerPage = Math.max(1, currentCustomerPage);
+
+  const start = (currentCustomerPage - 1) * CUSTOMERS_PAGE_SIZE;
+  const pagedCustomers = filtered.slice(start, start + CUSTOMERS_PAGE_SIZE);
+
+  countEl.textContent = query
+    ? `(${filtered.length}/${allCustomersCache.length})`
+    : `(${allCustomersCache.length})`;
+
+  if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-muted)">Chưa có khách.</td></tr>`;
+      paginationEl.innerHTML = '';
+      return;
+  }
+
+  tbody.innerHTML = pagedCustomers.map(c => `
       <tr>
         <td>#${c.usersId}</td>
         <td>
@@ -439,7 +478,40 @@ window.loadCustomers = async function () {
         </td>
       </tr>
     `).join('');
-  } catch (err) { console.error(err); }
+
+  renderCustomerPagination(totalPages);
+}
+
+function renderCustomerPagination(totalPages) {
+  const paginationEl = document.getElementById('customerPagination');
+  if (!paginationEl) return;
+
+  if (totalPages <= 1) {
+    paginationEl.innerHTML = '';
+    return;
+  }
+
+  const pages = [];
+  for (let page = 1; page <= totalPages; page += 1) {
+    pages.push(`
+      <button class="orders-page-btn ${page === currentCustomerPage ? 'active' : ''}" onclick="gotoCustomerPage(${page})">${page}</button>
+    `);
+  }
+
+  paginationEl.innerHTML = `
+    <button class="orders-page-btn" onclick="gotoCustomerPage(${currentCustomerPage - 1})" ${currentCustomerPage === 1 ? 'disabled' : ''}>
+      <i class="fa-solid fa-chevron-left"></i>
+    </button>
+    ${pages.join('')}
+    <button class="orders-page-btn" onclick="gotoCustomerPage(${currentCustomerPage + 1})" ${currentCustomerPage === totalPages ? 'disabled' : ''}>
+      <i class="fa-solid fa-chevron-right"></i>
+    </button>
+  `;
+}
+
+window.gotoCustomerPage = function (page) {
+  currentCustomerPage = page;
+  renderCustomersTable();
 };
 
 window.openAddHoursModal = function (id) {
@@ -582,19 +654,9 @@ window.saveCustomer = async function () {
 
 // Hàm tìm kiếm khách hàng bằng input
 window.filterCustomerList = function () {
-  const searchTxt = (document.getElementById('searchInputCustomer').value || '').toLowerCase();
-  const rows = document.querySelectorAll('#customerTbody tr');
-  rows.forEach(row => {
-    // skip the empty state row
-    if (row.cells.length < 3) return;
-    const name = row.cells[1].textContent.toLowerCase();
-    const phone = row.cells[2].textContent.toLowerCase();
-    if (name.includes(searchTxt) || phone.includes(searchTxt)) {
-      row.style.display = '';
-    } else {
-      row.style.display = 'none';
-    }
-  });
+  customerSearchQuery = document.getElementById('searchInputCustomer').value || '';
+  currentCustomerPage = 1;
+  renderCustomersTable();
 }
 
 // ===== SERVICES SECTION =====
@@ -733,8 +795,7 @@ window.loadPackages = async function () {
 
     grid.innerHTML = packages.map(p => {
       return `
-        <div class="package-card package-popular">
-          <div class="package-badge-popular" style="background:#ef4444;"><i class="fa-solid fa-fire"></i> HOT</div>
+        <div class="package-card">
           <h4 style="font-size:16px; font-weight:700; color:var(--primary-color);">${p.name}</h4>
           <div style="margin: 10px 0; font-size:24px; font-weight:800; color:#b45309;">${formatCurrency(p.price)}</div>
           <div style="display:flex; align-items:center; gap:6px; color:var(--text-muted); font-size:13px; margin-bottom:14px;">
@@ -1131,28 +1192,45 @@ window.loadReports = async function () {
     document.getElementById('reportTotalTransactions').textContent = Number(summary.totalTransactions) || 0;
     document.getElementById('reportActiveDays').textContent = Number(summary.activeDays) || 0;
 
-    renderReportDailyTable(dailyRows);
-    renderReportDetail(dailyRows[0]);
+    reportDailyCache = dailyRows;
+    currentReportDailyPage = 1;
+    currentReportDetailPage = 1;
+    currentReportSelectedDate = dailyRows[0]?.date || null;
+
+    renderReportDailyTable();
+    renderReportDetailByDate(currentReportSelectedDate);
 
   } catch (err) { console.error(err); }
 };
 
-function renderReportDailyTable(dailyRows) {
+function renderReportDailyTable() {
   const tbody = document.getElementById('reportTbody');
+  const paginationEl = document.getElementById('reportDailyPagination');
   if (!tbody) return;
 
+  const dailyRows = reportDailyCache;
   if (dailyRows.length === 0) {
     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;">Không có doanh thu trong tháng đã chọn.</td></tr>`;
+    if (paginationEl) paginationEl.innerHTML = '';
     return;
   }
 
-  tbody.innerHTML = dailyRows.map((day, index) => {
+  const totalPages = Math.max(1, Math.ceil(dailyRows.length / REPORT_DAILY_PAGE_SIZE));
+  currentReportDailyPage = Math.max(1, Math.min(currentReportDailyPage, totalPages));
+  const start = (currentReportDailyPage - 1) * REPORT_DAILY_PAGE_SIZE;
+  const pagedRows = dailyRows.slice(start, start + REPORT_DAILY_PAGE_SIZE);
+
+  if (!currentReportSelectedDate || !pagedRows.some((d) => d.date === currentReportSelectedDate)) {
+    currentReportSelectedDate = pagedRows[0]?.date || null;
+  }
+
+  tbody.innerHTML = pagedRows.map((day) => {
     const topItems = (day.topItems || [])
       .map((it) => `${it.name} x${it.qty}`)
       .join(' • ');
 
     return `
-      <tr class="report-day-row ${index === 0 ? 'is-selected' : ''}" data-day="${day.date}">
+      <tr class="report-day-row ${day.date === currentReportSelectedDate ? 'is-selected' : ''}" data-day="${day.date}">
         <td style="font-weight:600">${formatDate(day.date)}</td>
         <td style="font-weight:800;color:#16a34a;">${formatCurrency(day.totalRevenue)}</td>
         <td>${day.transactionCount}</td>
@@ -1166,28 +1244,44 @@ function renderReportDailyTable(dailyRows) {
   const rowByDate = new Map(dailyRows.map((d) => [d.date, d]));
   tbody.querySelectorAll('.report-day-row').forEach((row) => {
     row.addEventListener('click', () => {
-      tbody.querySelectorAll('.report-day-row').forEach((r) => r.classList.remove('is-selected'));
-      row.classList.add('is-selected');
+      currentReportSelectedDate = row.dataset.day;
+      currentReportDetailPage = 1;
+      renderReportDailyTable();
       renderReportDetail(rowByDate.get(row.dataset.day));
     });
   });
+
+  renderReportDailyPagination(totalPages);
 }
 
 function renderReportDetail(day) {
   const title = document.getElementById('reportDetailTitle');
   const tbody = document.getElementById('reportDetailTbody');
+  const paginationEl = document.getElementById('reportDetailPagination');
   if (!tbody || !title) return;
 
   if (!day) {
     title.textContent = 'Chi tiết giao dịch theo ngày';
     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;">Không có dữ liệu.</td></tr>`;
+    if (paginationEl) paginationEl.innerHTML = '';
     return;
   }
 
   title.textContent = `Chi tiết ngày ${formatDate(day.date)} - ${formatCurrency(day.totalRevenue)}`;
 
   const txns = [...day.transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
-  tbody.innerHTML = txns.map((txn) => `
+  const totalPages = Math.max(1, Math.ceil(txns.length / REPORT_DETAIL_PAGE_SIZE));
+  currentReportDetailPage = Math.max(1, Math.min(currentReportDetailPage, totalPages));
+  const start = (currentReportDetailPage - 1) * REPORT_DETAIL_PAGE_SIZE;
+  const pagedTxns = txns.slice(start, start + REPORT_DETAIL_PAGE_SIZE);
+
+  if (pagedTxns.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;">Không có giao dịch trong ngày này.</td></tr>`;
+    renderReportDetailPagination(totalPages);
+    return;
+  }
+
+  tbody.innerHTML = pagedTxns.map((txn) => `
     <tr>
       <td>${formatDateTime(txn.date)}</td>
       <td>${txn.customerName || 'N/A'}</td>
@@ -1197,7 +1291,85 @@ function renderReportDetail(day) {
       <td style="font-weight:700;color:#16a34a;">${formatCurrency(txn.amount)}</td>
     </tr>
   `).join('');
+
+  renderReportDetailPagination(totalPages);
 }
+
+function renderReportDailyPagination(totalPages) {
+  const paginationEl = document.getElementById('reportDailyPagination');
+  if (!paginationEl) return;
+
+  if (totalPages <= 1) {
+    paginationEl.innerHTML = '';
+    return;
+  }
+
+  const pages = [];
+  for (let page = 1; page <= totalPages; page += 1) {
+    pages.push(`<button class="orders-page-btn ${page === currentReportDailyPage ? 'active' : ''}" onclick="gotoReportDailyPage(${page})">${page}</button>`);
+  }
+
+  paginationEl.innerHTML = `
+    <button class="orders-page-btn" onclick="gotoReportDailyPage(${currentReportDailyPage - 1})" ${currentReportDailyPage === 1 ? 'disabled' : ''}>
+      <i class="fa-solid fa-chevron-left"></i>
+    </button>
+    ${pages.join('')}
+    <button class="orders-page-btn" onclick="gotoReportDailyPage(${currentReportDailyPage + 1})" ${currentReportDailyPage === totalPages ? 'disabled' : ''}>
+      <i class="fa-solid fa-chevron-right"></i>
+    </button>
+  `;
+}
+
+function renderReportDetailPagination(totalPages) {
+  const paginationEl = document.getElementById('reportDetailPagination');
+  if (!paginationEl) return;
+
+  if (totalPages <= 1) {
+    paginationEl.innerHTML = '';
+    return;
+  }
+
+  const pages = [];
+  for (let page = 1; page <= totalPages; page += 1) {
+    pages.push(`<button class="orders-page-btn ${page === currentReportDetailPage ? 'active' : ''}" onclick="gotoReportDetailPage(${page})">${page}</button>`);
+  }
+
+  paginationEl.innerHTML = `
+    <button class="orders-page-btn" onclick="gotoReportDetailPage(${currentReportDetailPage - 1})" ${currentReportDetailPage === 1 ? 'disabled' : ''}>
+      <i class="fa-solid fa-chevron-left"></i>
+    </button>
+    ${pages.join('')}
+    <button class="orders-page-btn" onclick="gotoReportDetailPage(${currentReportDetailPage + 1})" ${currentReportDetailPage === totalPages ? 'disabled' : ''}>
+      <i class="fa-solid fa-chevron-right"></i>
+    </button>
+  `;
+}
+
+function renderReportDetailByDate(date) {
+  const rowByDate = new Map(reportDailyCache.map((d) => [d.date, d]));
+  renderReportDetail(rowByDate.get(date));
+}
+
+window.gotoReportDailyPage = function (page) {
+  const totalPages = Math.max(1, Math.ceil(reportDailyCache.length / REPORT_DAILY_PAGE_SIZE));
+  currentReportDailyPage = Math.max(1, Math.min(page, totalPages));
+
+  const start = (currentReportDailyPage - 1) * REPORT_DAILY_PAGE_SIZE;
+  const pagedRows = reportDailyCache.slice(start, start + REPORT_DAILY_PAGE_SIZE);
+  currentReportSelectedDate = pagedRows[0]?.date || null;
+  currentReportDetailPage = 1;
+
+  renderReportDailyTable();
+  renderReportDetailByDate(currentReportSelectedDate);
+};
+
+window.gotoReportDetailPage = function (page) {
+  const day = reportDailyCache.find((d) => d.date === currentReportSelectedDate);
+  const txns = day?.transactions || [];
+  const totalPages = Math.max(1, Math.ceil(txns.length / REPORT_DETAIL_PAGE_SIZE));
+  currentReportDetailPage = Math.max(1, Math.min(page, totalPages));
+  renderReportDetail(day);
+};
 
 // Initial calls
 loadDashboard();

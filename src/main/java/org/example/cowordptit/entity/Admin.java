@@ -3,9 +3,6 @@ package org.example.cowordptit.entity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 
 /**
  * Admin — Quản trị viên (chỉ có duy nhất 1 bản ghi với admin_id = 1)
@@ -13,9 +10,6 @@ import lombok.NoArgsConstructor;
  */
 @Entity
 @jakarta.persistence.Table(name = "Admin")
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
 public class Admin {
 
     @Id
@@ -31,4 +25,46 @@ public class Admin {
     /** BCrypt hash cua mat khau */
     @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
+
+    public Admin() {
+    }
+
+    public Admin(Integer adminId, String username, String phone, String passwordHash) {
+        this.adminId = adminId;
+        this.username = username;
+        this.phone = phone;
+        this.passwordHash = passwordHash;
+    }
+
+    public Integer getAdminId() {
+        return adminId;
+    }
+
+    public void setAdminId(Integer adminId) {
+        this.adminId = adminId;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
 }
