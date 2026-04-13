@@ -1,6 +1,5 @@
 package org.example.cowordptit.service;
 
-import lombok.RequiredArgsConstructor;
 import org.example.cowordptit.entity.MenuIItem;
 import org.example.cowordptit.repository.CafeServiceRepository;
 import org.springframework.stereotype.Service;
@@ -12,10 +11,13 @@ import java.util.Map;
 import java.util.Optional;
 
 @Service
-@RequiredArgsConstructor
 public class MenuService {
 
     private final CafeServiceRepository cafeServiceRepository;
+
+    public MenuService(CafeServiceRepository cafeServiceRepository) {
+        this.cafeServiceRepository = cafeServiceRepository;
+    }
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getAll() {

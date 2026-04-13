@@ -1,6 +1,5 @@
 package org.example.cowordptit.service;
 
-import lombok.RequiredArgsConstructor;
 import org.example.cowordptit.entity.MenuIItem;
 import org.example.cowordptit.entity.Customer;
 import org.example.cowordptit.entity.ServiceRequest;
@@ -24,7 +23,6 @@ import java.util.Map;
 import java.util.Optional;
 
 @Service
-@RequiredArgsConstructor
 public class ServiceRequestService {
 
     private final ServiceRequestRepository requestRepository;
@@ -32,6 +30,16 @@ public class ServiceRequestService {
     private final CafeSessionRepository sessionRepository;
     private final CafeServiceRepository cafeServiceRepository;
     private final PackageRepository packageRepository;
+
+    public ServiceRequestService(ServiceRequestRepository requestRepository, CustomerRepository customerRepository,
+            CafeSessionRepository sessionRepository, CafeServiceRepository cafeServiceRepository,
+            PackageRepository packageRepository) {
+        this.requestRepository = requestRepository;
+        this.customerRepository = customerRepository;
+        this.sessionRepository = sessionRepository;
+        this.cafeServiceRepository = cafeServiceRepository;
+        this.packageRepository = packageRepository;
+    }
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getAll() {

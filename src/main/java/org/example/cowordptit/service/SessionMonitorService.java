@@ -1,6 +1,5 @@
 package org.example.cowordptit.service;
 
-import lombok.RequiredArgsConstructor;
 import org.example.cowordptit.entity.CafeSession;
 import org.example.cowordptit.entity.Customer;
 import org.example.cowordptit.repository.CafeSessionRepository;
@@ -16,11 +15,15 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
-@RequiredArgsConstructor
 public class SessionMonitorService {
 
     private final CafeSessionRepository sessionRepository;
     private final CustomerRepository customerRepository;
+
+    public SessionMonitorService(CafeSessionRepository sessionRepository, CustomerRepository customerRepository) {
+        this.sessionRepository = sessionRepository;
+        this.customerRepository = customerRepository;
+    }
 
     @Scheduled(fixedRate = 60000) // Kiem tra moi phut
     @Transactional

@@ -1,6 +1,5 @@
 package org.example.cowordptit.controller;
 
-import lombok.RequiredArgsConstructor;
 import org.example.cowordptit.dto.request.MenuRequestDto;
 import org.example.cowordptit.dto.response.ApiResponse;
 import org.example.cowordptit.service.MenuService;
@@ -21,10 +20,13 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/menu")
-@RequiredArgsConstructor
 public class MenuController {
 
     private final MenuService menuService;
+
+    public MenuController(MenuService menuService) {
+        this.menuService = menuService;
+    }
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getAll() {

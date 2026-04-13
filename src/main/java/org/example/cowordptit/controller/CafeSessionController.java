@@ -1,6 +1,5 @@
 package org.example.cowordptit.controller;
 
-import lombok.RequiredArgsConstructor;
 import org.example.cowordptit.dto.request.CheckInRequest;
 import org.example.cowordptit.dto.response.ApiResponse;
 import org.example.cowordptit.service.CafeSessionService;
@@ -21,10 +20,13 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/sessions")
-@RequiredArgsConstructor
 public class CafeSessionController {
 
     private final CafeSessionService cafeSessionService;
+
+    public CafeSessionController(CafeSessionService cafeSessionService) {
+        this.cafeSessionService = cafeSessionService;
+    }
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getAll() {

@@ -104,6 +104,22 @@
           <div class="card-value" id="statServices">—</div>
           <div class="card-sub">đã order</div>
         </div>
+        <div class="card">
+          <div class="card-header">
+            <h3>VIP trong tháng</h3>
+            <div class="card-icon"><i class="fa-solid fa-crown"></i></div>
+          </div>
+          <div class="card-value" id="statVipMonth">—</div>
+          <div class="card-sub" id="statVipThresholdLabel">ngưỡng VIP: 1.000.000đ</div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h3>VIP tích lũy</h3>
+            <div class="card-icon"><i class="fa-solid fa-gem"></i></div>
+          </div>
+          <div class="card-value" id="statVipAllTime">—</div>
+          <div class="card-sub">toàn thời gian</div>
+        </div>
       </div>
 
       <!-- Bottom grid -->
@@ -130,6 +146,50 @@
               <p>Đang tải...</p>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div class="reports-vip-grid" style="margin-top:20px;">
+        <div class="table-container">
+          <div class="table-header">
+            <h3>Vinh danh doanh thu theo tháng</h3>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Hạng</th>
+                <th>Khách hàng</th>
+                <th>Doanh thu</th>
+                <th>Giờ đã nạp</th>
+              </tr>
+            </thead>
+            <tbody id="dashboardRankMonthTbody">
+              <tr>
+                <td colspan="4" style="text-align:center;padding:20px">Đang tải...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="table-container">
+          <div class="table-header">
+            <h3>Vinh danh doanh thu tích lũy</h3>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Hạng</th>
+                <th>Khách hàng</th>
+                <th>Doanh thu</th>
+                <th>Giờ đã nạp</th>
+              </tr>
+            </thead>
+            <tbody id="dashboardRankAllTimeTbody">
+              <tr>
+                <td colspan="4" style="text-align:center;padding:20px">Đang tải...</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </section>
@@ -293,6 +353,12 @@
         <div class="reports-filter-bar">
           <label for="reportMonthFilter" style="font-weight:600;color:var(--text-main)">Tháng báo cáo</label>
           <input type="month" id="reportMonthFilter" />
+          <label for="reportViewMode" style="font-weight:600;color:var(--text-main)">Chế độ biểu đồ</label>
+          <select id="reportViewMode">
+            <option value="MONTH">Theo tháng</option>
+            <option value="DAY">Theo ngày cụ thể</option>
+          </select>
+          <input type="date" id="reportDateFilter" />
           <span id="reportMonthLabel" class="text-muted"></span>
         </div>
 
@@ -318,6 +384,38 @@
               <div class="card-icon"><i class="fa-solid fa-calendar-day"></i></div>
             </div>
             <div class="card-value" id="reportActiveDays">—</div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h3>VIP tháng này</h3>
+              <div class="card-icon"><i class="fa-solid fa-crown"></i></div>
+            </div>
+            <div class="card-value" id="reportVipMonthCount">—</div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h3>VIP toàn thời gian</h3>
+              <div class="card-icon"><i class="fa-solid fa-gem"></i></div>
+            </div>
+            <div class="card-value" id="reportVipAllTimeCount">—</div>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <div class="table-header">
+            <h3>Biểu đồ tròn doanh thu (Dịch vụ vs Gói nạp)</h3>
+          </div>
+          <div class="report-pie-layout">
+            <div class="report-pie-left">
+              <div id="reportPieMain" class="report-pie"></div>
+              <div id="reportPieMainLegend" class="report-service-legend"></div>
+              <div id="reportPieTooltip" class="report-pie-tooltip"></div>
+            </div>
+            <div class="report-pie-right">
+              <h4 id="reportDetailPanelTitle">Chi tiết thành phần doanh thu</h4>
+              <p id="reportDetailPanelHint" class="text-muted">Di chuột vào từng mảng màu để xem danh sách dịch vụ/gói nạp.</p>
+              <div id="reportDetailPanelBody" class="report-detail-panel"></div>
+            </div>
           </div>
         </div>
 
@@ -368,6 +466,50 @@
             </tbody>
           </table>
           <div class="orders-pagination" id="reportDetailPagination" style="margin-top:14px;"></div>
+        </div>
+
+        <div class="reports-vip-grid">
+          <div class="table-container">
+            <div class="table-header">
+              <h3 id="reportVipMonthTitle">Khách VIP theo tháng</h3>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Hạng</th>
+                  <th>Khách hàng</th>
+                  <th>Doanh thu</th>
+                  <th>Giờ đã nạp</th>
+                </tr>
+              </thead>
+              <tbody id="reportVipMonthTbody">
+                <tr>
+                  <td colspan="4" style="text-align:center;padding:20px">Đang tải...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="table-container">
+            <div class="table-header">
+              <h3 id="reportVipAllTimeTitle">Khách VIP toàn thời gian</h3>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Hạng</th>
+                  <th>Khách hàng</th>
+                  <th>Doanh thu</th>
+                  <th>Giờ đã nạp</th>
+                </tr>
+              </thead>
+              <tbody id="reportVipAllTimeTbody">
+                <tr>
+                  <td colspan="4" style="text-align:center;padding:20px">Đang tải...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </section>

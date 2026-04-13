@@ -1,6 +1,5 @@
 package org.example.cowordptit.service;
 
-import lombok.RequiredArgsConstructor;
 import org.example.cowordptit.entity.CafeSession;
 import org.example.cowordptit.entity.Customer;
 import org.example.cowordptit.entity.PaymentRecord;
@@ -9,12 +8,15 @@ import org.example.cowordptit.repository.CafeSessionRepository;
 import org.example.cowordptit.repository.CustomerRepository;
 import org.example.cowordptit.repository.PaymentRepository;
 import org.example.cowordptit.repository.ServiceRequestRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -28,7 +30,6 @@ import java.util.Set;
 import java.util.TreeMap;
 
 @Service
-@RequiredArgsConstructor
 public class ReportService {
 
     private static final BigDecimal SESSION_HOURLY_RATE = new BigDecimal("18000");
@@ -37,6 +38,17 @@ public class ReportService {
     private final CafeSessionRepository sessionRepository;
     private final CustomerRepository customerRepository;
     private final ServiceRequestRepository requestRepository;
+    private final BigDecimal vipPurchasedHoursThreshold;
+
+    public ReportService(PaymentRepository paymentRepository, CafeSessionRepository sessionRepository,
+            CustomerRepository customerRepository, ServiceRequestRepository requestRepository,
+            @Value("${app.vip.purchased-hours-threshold:60}") BigDecimal vipPurchasedHoursThreshold) {
+        this.paymentRepository = paymentRepository;
+        this.sessionRepository = sessionRepository;
+        this.customerRepository = customerRepository;
+        this.requestRepository = requestRepository;
+        this.vipPurchasedHoursThreshold = vipPurchasedHoursThreshold;
+    }
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getReports(LocalDate from, LocalDate to) {
@@ -108,7 +120,7 @@ public class ReportService {
     }
 
     @Transactional(readOnly = true)
-    public Map<String, Object> getTransactionReport(String month, LocalDate from, LocalDate to) {
+    public Map<String, Object> getTransactionReport(String month, LocalDate from, LocalDate to, BigDecimal vipThreshold) {
         LocalDate effectiveFrom = from;
         LocalDate effectiveTo = to;
 
@@ -119,6 +131,8 @@ public class ReportService {
         }
 
         List<Map<String, Object>> transactions = buildTransactions(effectiveFrom, effectiveTo);
+        List<Map<String, Object>> allTimeTransactions = buildTransactions(null, null);
+        Map<Long, CustomerVipMetrics> customerVipMetrics = buildCustomerVipMetrics();
         Map<String, DailyTransactionRevenue> dailyMap = new TreeMap<>(Comparator.reverseOrder());
 
         BigDecimal totalRevenue = BigDecimal.ZERO;
@@ -189,6 +203,22 @@ public class ReportService {
         period.put("from", effectiveFrom != null ? effectiveFrom.toString() : null);
         period.put("to", effectiveTo != null ? effectiveTo.toString() : null);
 
+        BigDecimal normalizedVipThreshold = vipThreshold != null && vipThreshold.compareTo(BigDecimal.ZERO) > 0
+                ? vipThreshold
+                : new BigDecimal("1000000");
+
+        Map<String, Object> vip = new LinkedHashMap<>();
+        vip.put("threshold", normalizedVipThreshold);
+        vip.put("purchasedHoursThreshold", vipPurchasedHoursThreshold);
+        vip.put("month", buildVipSummary(transactions, normalizedVipThreshold, customerVipMetrics));
+        vip.put("allTime", buildVipSummary(allTimeTransactions, normalizedVipThreshold, customerVipMetrics));
+
+        Map<String, Object> leaderboard = new LinkedHashMap<>();
+        leaderboard.put("month", buildLeaderboard(transactions, customerVipMetrics));
+        leaderboard.put("allTime", buildLeaderboard(allTimeTransactions, customerVipMetrics));
+
+        Map<String, Object> serviceTrend = buildServiceTrend(dailyMap);
+
         return Map.of(
                 "period", period,
                 "summary", Map.of(
@@ -197,8 +227,206 @@ public class ReportService {
                         "activeDays", daily.size(),
                         "serviceRevenue", totalServiceRevenue,
                         "packageRevenue", totalPackageRevenue),
+                "serviceTrend", serviceTrend,
+                "vip", vip,
+                "leaderboard", leaderboard,
                 "daily", daily,
                 "transactions", transactions);
+    }
+
+    private Map<Long, CustomerVipMetrics> buildCustomerVipMetrics() {
+        Map<Long, CustomerVipMetrics> metricsByCustomer = new HashMap<>();
+
+        for (Customer customer : customerRepository.findAll()) {
+            if (customer.getUsersId() == null) {
+                continue;
+            }
+            CustomerVipMetrics metrics = new CustomerVipMetrics();
+            metrics.remainingHours = customer.getRemainingHours() != null ? customer.getRemainingHours() : BigDecimal.ZERO;
+            metricsByCustomer.put(customer.getUsersId(), metrics);
+        }
+
+        for (CafeSession session : sessionRepository.findAll()) {
+            if (session.getCustomer() == null || session.getCustomer().getUsersId() == null) {
+                continue;
+            }
+
+            Long usersId = session.getCustomer().getUsersId();
+            CustomerVipMetrics metrics = metricsByCustomer.computeIfAbsent(usersId, ignored -> new CustomerVipMetrics());
+            metrics.totalUsedHours = metrics.totalUsedHours.add(resolveUsedHours(session));
+        }
+
+        for (CustomerVipMetrics metrics : metricsByCustomer.values()) {
+            metrics.totalUsedHours = metrics.totalUsedHours.setScale(2, RoundingMode.HALF_UP);
+            metrics.totalPurchasedHours = metrics.totalUsedHours.add(metrics.remainingHours).setScale(2, RoundingMode.HALF_UP);
+            metrics.isVip = metrics.totalPurchasedHours.compareTo(vipPurchasedHoursThreshold) >= 0;
+        }
+
+        return metricsByCustomer;
+    }
+
+    private BigDecimal resolveUsedHours(CafeSession session) {
+        if (session.getStatus() == CafeSession.SessionStatus.ONGOING && session.getCheckIn() != null) {
+            long mins = Duration.between(session.getCheckIn(), LocalDateTime.now()).toMinutes();
+            if (mins <= 0) {
+                return BigDecimal.ZERO;
+            }
+            return BigDecimal.valueOf(mins).divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
+        }
+
+        if (session.getHoursUsed() == null || session.getHoursUsed().compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+
+        return session.getHoursUsed();
+    }
+
+    private Map<String, Object> buildLeaderboard(List<Map<String, Object>> transactions,
+            Map<Long, CustomerVipMetrics> customerVipMetrics) {
+        Map<Long, CustomerRevenue> byCustomer = new HashMap<>();
+
+        for (Map<String, Object> txn : transactions) {
+            Long usersId = (Long) txn.get("usersId");
+            if (usersId == null) {
+                continue;
+            }
+
+            String name = (String) txn.get("customerName");
+            String phone = (String) txn.get("customerPhone");
+            BigDecimal amount = txn.get("amount") instanceof BigDecimal value ? value : BigDecimal.ZERO;
+
+            CustomerRevenue row = byCustomer.computeIfAbsent(usersId, ignored -> new CustomerRevenue(usersId, name, phone));
+            row.totalRevenue = row.totalRevenue.add(amount);
+        }
+
+        List<CustomerRevenue> sorted = byCustomer.values().stream()
+                .sorted((a, b) -> b.totalRevenue.compareTo(a.totalRevenue))
+                .toList();
+
+        List<Map<String, Object>> items = new ArrayList<>();
+        int rank = 1;
+        for (CustomerRevenue row : sorted) {
+            CustomerVipMetrics metrics = customerVipMetrics.getOrDefault(row.usersId, new CustomerVipMetrics());
+
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("rank", rank++);
+            item.put("usersId", row.usersId);
+            item.put("name", row.name);
+            item.put("phone", row.phone);
+            item.put("revenue", row.totalRevenue);
+            item.put("totalHoursUsed", metrics.totalUsedHours);
+            item.put("totalPurchasedHours", metrics.totalPurchasedHours);
+            item.put("isVipByHours", metrics.isVip);
+            item.put("isVipByPurchasedHours", metrics.isVip);
+            items.add(item);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("count", items.size());
+        result.put("items", items);
+        return result;
+    }
+
+    private Map<String, Object> buildServiceTrend(Map<String, DailyTransactionRevenue> dailyMap) {
+        Map<String, BigDecimal> serviceTotals = new HashMap<>();
+        for (DailyTransactionRevenue day : dailyMap.values()) {
+            for (Map.Entry<String, ItemRevenue> entry : day.items.entrySet()) {
+                ItemRevenue item = entry.getValue();
+                if (!"SERVICE".equals(item.type)) {
+                    continue;
+                }
+                serviceTotals.merge(item.name, item.revenue, BigDecimal::add);
+            }
+        }
+
+        List<String> topServiceNames = serviceTotals.entrySet().stream()
+                .sorted((a, b) -> b.getValue().compareTo(a.getValue()))
+                .limit(5)
+                .map(Map.Entry::getKey)
+                .toList();
+
+        List<String> labels = new ArrayList<>(dailyMap.keySet());
+        labels.sort(String::compareTo);
+
+        List<Map<String, Object>> services = new ArrayList<>();
+        for (String serviceName : topServiceNames) {
+            List<BigDecimal> data = new ArrayList<>();
+            BigDecimal totalRevenue = BigDecimal.ZERO;
+
+            for (String date : labels) {
+                DailyTransactionRevenue row = dailyMap.get(date);
+                String key = "SERVICE:" + serviceName;
+                ItemRevenue item = row != null ? row.items.get(key) : null;
+                BigDecimal amount = item != null ? item.revenue : BigDecimal.ZERO;
+                data.add(amount);
+                totalRevenue = totalRevenue.add(amount);
+            }
+
+            Map<String, Object> serviceSeries = new LinkedHashMap<>();
+            serviceSeries.put("name", serviceName);
+            serviceSeries.put("totalRevenue", totalRevenue);
+            serviceSeries.put("data", data);
+            services.add(serviceSeries);
+        }
+
+        Map<String, Object> trend = new LinkedHashMap<>();
+        trend.put("labels", labels);
+        trend.put("services", services);
+        return trend;
+    }
+
+    private Map<String, Object> buildVipSummary(List<Map<String, Object>> transactions, BigDecimal threshold,
+            Map<Long, CustomerVipMetrics> customerVipMetrics) {
+        Map<Long, CustomerRevenue> byCustomer = new HashMap<>();
+
+        for (Map<String, Object> txn : transactions) {
+            Long usersId = (Long) txn.get("usersId");
+            if (usersId == null) {
+                continue;
+            }
+            String name = (String) txn.get("customerName");
+            String phone = (String) txn.get("customerPhone");
+            BigDecimal amount = txn.get("amount") instanceof BigDecimal value ? value : BigDecimal.ZERO;
+
+            CustomerRevenue revenue = byCustomer.computeIfAbsent(usersId,
+                    ignored -> new CustomerRevenue(usersId, name, phone));
+            revenue.totalRevenue = revenue.totalRevenue.add(amount);
+        }
+
+        List<Map<String, Object>> customers = byCustomer.values().stream()
+                .sorted((a, b) -> b.totalRevenue.compareTo(a.totalRevenue))
+                .map(item -> {
+                    CustomerVipMetrics metrics = customerVipMetrics.getOrDefault(item.usersId, new CustomerVipMetrics());
+                    boolean isVipByRevenue = item.totalRevenue.compareTo(threshold) >= 0;
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("usersId", item.usersId);
+                    row.put("name", item.name);
+                    row.put("phone", item.phone);
+                    row.put("revenue", item.totalRevenue);
+                    row.put("totalHoursUsed", metrics.totalUsedHours);
+                    row.put("totalPurchasedHours", metrics.totalPurchasedHours);
+                    row.put("isVip", isVipByRevenue);
+                    row.put("isVipByHours", metrics.isVip);
+                    row.put("isVipByPurchasedHours", metrics.isVip);
+                    row.put("tier", isVipByRevenue ? "VIP" : "REGULAR");
+                    return row;
+                })
+                .toList();
+
+        long vipCount = customers.stream()
+                .filter(row -> Boolean.TRUE.equals(row.get("isVip")))
+                .count();
+
+        BigDecimal totalRevenue = byCustomer.values().stream()
+                .map(item -> item.totalRevenue)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("count", vipCount);
+        result.put("totalCustomers", customers.size());
+        result.put("totalRevenue", totalRevenue);
+        result.put("customers", customers);
+        return result;
     }
 
     private List<Map<String, Object>> buildTransactions(LocalDate from, LocalDate to) {
@@ -297,6 +525,8 @@ public class ReportService {
         String customerName = request.getCustomer() != null && request.getCustomer().getName() != null
                 ? request.getCustomer().getName()
                 : "N/A";
+        String customerPhone = request.getCustomer() != null ? request.getCustomer().getPhone() : null;
+        Long usersId = request.getCustomer() != null ? request.getCustomer().getUsersId() : null;
 
         int quantity = request.getQuantity() != null ? request.getQuantity() : 1;
 
@@ -306,9 +536,14 @@ public class ReportService {
         row.put("amount", amount != null ? amount : BigDecimal.ZERO);
         row.put("method", paymentMethod != null ? paymentMethod.toUpperCase(Locale.ROOT) : "CASH");
         row.put("date", date);
+        row.put("usersId", usersId);
         row.put("customerName", customerName);
+        row.put("customerPhone", customerPhone);
         row.put("itemName", itemName);
         row.put("itemType", itemType);
+        row.put("serviceCategory", request.getService() != null && request.getService().getType() != null
+                ? request.getService().getType().name()
+                : null);
         row.put("quantity", quantity);
         return row;
     }
@@ -356,5 +591,25 @@ public class ReportService {
             this.name = name;
             this.type = type;
         }
+    }
+
+    private static class CustomerRevenue {
+        private final Long usersId;
+        private final String name;
+        private final String phone;
+        private BigDecimal totalRevenue = BigDecimal.ZERO;
+
+        private CustomerRevenue(Long usersId, String name, String phone) {
+            this.usersId = usersId;
+            this.name = name;
+            this.phone = phone;
+        }
+    }
+
+    private static class CustomerVipMetrics {
+        private BigDecimal remainingHours = BigDecimal.ZERO;
+        private BigDecimal totalUsedHours = BigDecimal.ZERO;
+        private BigDecimal totalPurchasedHours = BigDecimal.ZERO;
+        private boolean isVip = false;
     }
 }

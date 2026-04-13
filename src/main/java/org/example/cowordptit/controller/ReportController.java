@@ -1,6 +1,5 @@
 package org.example.cowordptit.controller;
 
-import lombok.RequiredArgsConstructor;
 import org.example.cowordptit.dto.response.ApiResponse;
 import org.example.cowordptit.service.ReportService;
 import org.springframework.http.ResponseEntity;
@@ -10,15 +9,19 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/reports")
-@RequiredArgsConstructor
 public class ReportController {
 
     private final ReportService reportService;
+
+    public ReportController(ReportService reportService) {
+        this.reportService = reportService;
+    }
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getReports(
@@ -31,7 +34,8 @@ public class ReportController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> getTransactionReport(
             @RequestParam(required = false) String month,
             @RequestParam(required = false) LocalDate from,
-            @RequestParam(required = false) LocalDate to) {
-        return ResponseEntity.ok(ApiResponse.success(reportService.getTransactionReport(month, from, to)));
+            @RequestParam(required = false) LocalDate to,
+            @RequestParam(required = false) BigDecimal vipThreshold) {
+        return ResponseEntity.ok(ApiResponse.success(reportService.getTransactionReport(month, from, to, vipThreshold)));
     }
 }

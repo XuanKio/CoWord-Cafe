@@ -1,6 +1,5 @@
 package org.example.cowordptit.config;
 
-import lombok.RequiredArgsConstructor;
 import org.example.cowordptit.entity.*;
 import org.example.cowordptit.repository.*;
 import org.springframework.boot.CommandLineRunner;
@@ -11,7 +10,6 @@ import java.math.BigDecimal;
 
 
 @Configuration
-@RequiredArgsConstructor
 public class DataInitializer {
     // removed passwordEncoder
     @Bean

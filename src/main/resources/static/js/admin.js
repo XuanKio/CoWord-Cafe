@@ -85,6 +85,28 @@ function formatDate(dateStr) {
   return date.toLocaleDateString('vi-VN');
 }
 
+function normalizeText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .trim();
+}
+
+function normalizePhone(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function customerDisplayName(customerLike) {
+  const name = customerLike?.name || customerLike?.customerName || 'N/A';
+  const isVip = Boolean(customerLike?.isVipByPurchasedHours || customerLike?.isVipByHours);
+  return isVip
+    ? `${name} <i class="fa-solid fa-star vip-star" title="Khách VIP"></i>`
+    : name;
+}
+
 function trans(text) {
   const dict = {
     'ACTIVE': 'Hoạt động',
@@ -206,11 +228,15 @@ window.logout = function () {
 // ===== DASHBOARD =====
 window.loadDashboard = async function () {
   try {
-    const [sessions, customers, requests, payments] = await Promise.all([
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    const [sessions, customers, requests, payments, reportData] = await Promise.all([
       apiRequest('/sessions'),
       apiRequest('/customers'),
       apiRequest('/requests'),
-      apiRequest('/payments')
+      apiRequest('/payments'),
+      apiRequest(`/reports/transactions?month=${encodeURIComponent(currentMonth)}`)
     ]);
 
     customers.forEach(c => allCustomersMap[c.usersId] = c);
@@ -229,6 +255,12 @@ window.loadDashboard = async function () {
 
     const todayRequests = requests.filter(r => r.createdAt?.startsWith(today));
     document.getElementById('statServices').textContent = todayRequests.length;
+
+    const vipMonthCount = (reportData?.leaderboard?.month?.items || []).filter((i) => i.isVipByHours).length;
+    const vipAllTimeCount = (reportData?.leaderboard?.allTime?.items || []).filter((i) => i.isVipByHours).length;
+    document.getElementById('statVipMonth').textContent = vipMonthCount;
+    document.getElementById('statVipAllTime').textContent = vipAllTimeCount;
+    document.getElementById('statVipThresholdLabel').textContent = 'VIP nội bộ theo giờ đã nạp';
 
     document.getElementById('activeSessionCount').textContent = activeSessions.length;
 
@@ -251,7 +283,7 @@ window.loadDashboard = async function () {
             <div style="display:flex; align-items: center; gap: 12px;">
               <div class="avatar avatar-sm"><i class="fa-solid fa-user"></i></div>
               <div>
-                <div style="font-weight:600; font-size:14px; color:var(--text-main)">${s.customerName || c.name || 'N/A'} - ${c.phone || ''}</div>
+                <div style="font-weight:600; font-size:14px; color:var(--text-main)">${customerDisplayName(c.name ? c : { customerName: s.customerName })} - ${c.phone || ''}</div>
                 <div style="font-size:12px; color:var(--text-muted)">Giờ vào: ${formatDateTime(s.checkIn)}</div>
               </div>
             </div>
@@ -269,7 +301,7 @@ window.loadDashboard = async function () {
         <table style="width:100%; font-size:14px;">
           ${pendingOrders.map(r => `
             <tr>
-              <td style="padding:10px; border-bottom:1px solid #f1f5f9;"><strong>${r.customerName || 'N/A'}</strong></td>
+              <td style="padding:10px; border-bottom:1px solid #f1f5f9;"><strong>${customerDisplayName(allCustomersMap[r.usersId] || { customerName: r.customerName })}</strong></td>
               <td style="padding:10px; border-bottom:1px solid #f1f5f9; color:#f59e0b;">${r.serviceName || r.packageName || 'Yêu cầu'} x ${r.quantity}</td>
               <td style="padding:10px; border-bottom:1px solid #f1f5f9; text-align:right;">
                 <button class="btn-primary btn-sm" onclick="approveOrder(${r.serviceRequestsId})">Duyệt</button>
@@ -279,6 +311,9 @@ window.loadDashboard = async function () {
         </table>
       `;
     }
+
+    renderRevenueLeaderboard('dashboardRankMonthTbody', reportData?.leaderboard?.month?.items || [], 5, { onlyVip: true });
+    renderRevenueLeaderboard('dashboardRankAllTimeTbody', reportData?.leaderboard?.allTime?.items || [], 5, { onlyVip: true });
 
   } catch (error) {
     console.error('Dashboard error:', error);
@@ -306,7 +341,7 @@ window.loadCheckinSection = async function () {
             <div style="display:flex; align-items:center; gap:12px;">
               <div class="avatar"><i class="fa-solid fa-user"></i></div>
               <div>
-                <strong style="color:var(--text-main); font-size:14px;">${s.customerName || c.name || 'N/A'}</strong>
+                <strong style="color:var(--text-main); font-size:14px;">${customerDisplayName(c.name ? c : { customerName: s.customerName })}</strong>
                 <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">${c.phone || ''}</div>
               </div>
             </div>
@@ -333,34 +368,49 @@ window.loadCheckinSection = async function () {
 };
 
 document.getElementById('btnSearchCheckin').addEventListener('click', async () => {
-  const phone = document.getElementById('checkinPhone').value.trim();
+  const keyword = document.getElementById('checkinPhone').value.trim();
   const resContainer = document.getElementById('checkinResult');
 
-  if (!phone) {
-    showInfoModal('Thiếu thông tin', 'Vui lòng nhập số điện thoại để tìm khách check-in.');
+  if (!keyword) {
+    showInfoModal('Thiếu thông tin', 'Vui lòng nhập tên hoặc số điện thoại để tìm khách check-in.');
     return;
   }
   resContainer.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i></div>`;
 
   try {
     const customers = await apiRequest('/customers');
-    const found = customers.find(c => c.phone === phone);
+    const normalizedKeyword = normalizeText(keyword);
+    const numericKeyword = normalizePhone(keyword);
+    const isNumericOnly = /^\d+$/.test(keyword);
 
-    if (found) {
-      resContainer.innerHTML = `
-        <div style="background:var(--white); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; margin-top:20px; display:flex; justify-content:space-between; align-items:center;">
+    const matched = customers.filter((c) => {
+      const customerName = normalizeText(c.name);
+      const customerPhone = normalizePhone(c.phone);
+
+      if (isNumericOnly) {
+        return customerPhone.startsWith(numericKeyword);
+      }
+
+      return customerName.includes(normalizedKeyword)
+        || (numericKeyword ? customerPhone.includes(numericKeyword) : false);
+    });
+
+    if (matched.length > 0) {
+      resContainer.innerHTML = matched.map((found) => `
+        <div style="background:var(--white); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; margin-top:12px; display:flex; justify-content:space-between; align-items:center; gap:12px;">
           <div>
-            <h4 style="font-size:16px; margin-bottom:4px;">${found.name}</h4>
+            <h4 style="font-size:16px; margin-bottom:4px;">${customerDisplayName(found)}</h4>
+            <div style="font-size:13px; color:var(--text-muted); margin-bottom:6px;">SĐT: ${found.phone}</div>
             <span class="badge badge-info">Giờ còn lại: ${found.remainingHours}h</span>
           </div>
           <button class="btn-primary" onclick="doCheckIn(${found.usersId})"><i class="fa-solid fa-sign-in-alt"></i> CHECK-IN NGAY</button>
         </div>
-      `;
+      `).join('');
     } else {
       resContainer.innerHTML = `
         <div class="empty-state" style="padding:20px">
           <i class="fa-solid fa-user-xmark" style="color:#ef4444; margin-bottom:10px;"></i>
-          <p style="color:#dc2626; font-weight:600;">Không tìm thấy khách hàng với SĐT này</p>
+          <p style="color:#dc2626; font-weight:600;">Không tìm thấy khách hàng phù hợp</p>
           <p style="font-size:13px; color:#666; margin-top:5px;">Vui lòng thêm tài khoản bên phần Quản lý Khách hàng nếu khách chưa có.</p>
         </div>
       `;
@@ -436,12 +486,23 @@ function renderCustomersTable() {
   const paginationEl = document.getElementById('customerPagination');
   if (!tbody || !countEl || !paginationEl) return;
 
-  const query = customerSearchQuery.trim().toLowerCase();
+  const query = customerSearchQuery.trim();
+  const normalizedQuery = normalizeText(query);
+  const numericQuery = normalizePhone(query);
+  const isNumericOnly = /^\d+$/.test(query);
+
   const filtered = allCustomersCache.filter(c => {
     if (!query) return true;
-    const name = String(c.name || '').toLowerCase();
-    const phone = String(c.phone || '').toLowerCase();
-    return name.includes(query) || phone.includes(query);
+
+    const name = normalizeText(c.name);
+    const phone = normalizePhone(c.phone);
+
+    if (isNumericOnly) {
+      return phone.startsWith(numericQuery);
+    }
+
+    return name.includes(normalizedQuery)
+      || (numericQuery ? phone.includes(numericQuery) : false);
   });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / CUSTOMERS_PAGE_SIZE));
@@ -465,7 +526,7 @@ function renderCustomersTable() {
       <tr>
         <td>#${c.usersId}</td>
         <td>
-          <div style="font-weight:600; color:var(--text-main)">${c.name}</div>
+          <div style="font-weight:600; color:var(--text-main)">${customerDisplayName(c)}</div>
         </td>
         <td style="color:var(--text-muted)">${c.phone}</td>
         <td><span class="badge ${c.remainingHours > 0 ? 'badge-success' : 'badge-danger'}">${c.remainingHours}h</span></td>
@@ -981,7 +1042,7 @@ function renderOrderCard(r) {
       <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:200px;">
         <div class="order-card__avatar" style="margin:0;"><i class="fa-solid fa-user"></i></div>
         <div>
-          <div class="order-card__name">${r.customerName || 'N/A'}</div>
+          <div class="order-card__name">${customerDisplayName(allCustomersMap[r.usersId] || { customerName: r.customerName })}</div>
           <div class="order-card__time" style="margin-top:2px"><i class="fa-regular fa-clock"></i> ${formatDateTime(r.createdAt)}</div>
         </div>
       </div>
@@ -1048,7 +1109,7 @@ window.openOrderDetailModal = function (id) {
   const serviceLabel = order.serviceName || order.packageName || 'Yêu cầu';
 
   body.innerHTML = `
-    <div class="order-detail-row"><div class="order-detail-label">Khách hàng</div><div class="order-detail-value">${order.customerName || 'N/A'}</div></div>
+    <div class="order-detail-row"><div class="order-detail-label">Khách hàng</div><div class="order-detail-value">${customerDisplayName(allCustomersMap[order.usersId] || { customerName: order.customerName })}</div></div>
     <div class="order-detail-row"><div class="order-detail-label">Thời gian gửi</div><div class="order-detail-value">${formatDateTime(order.createdAt)}</div></div>
     <div class="order-detail-row"><div class="order-detail-label">Loại yêu cầu</div><div class="order-detail-value">${typeLabel}</div></div>
     <div class="order-detail-row"><div class="order-detail-label">Nội dung</div><div class="order-detail-value">${serviceLabel}</div></div>
@@ -1153,23 +1214,56 @@ window.loadReports = async function () {
   try {
     const monthFilter = document.getElementById('reportMonthFilter');
     const monthLabel = document.getElementById('reportMonthLabel');
+    const viewModeSelect = document.getElementById('reportViewMode');
+    const dateFilter = document.getElementById('reportDateFilter');
 
     if (monthFilter && !monthFilter.dataset.bound) {
       monthFilter.addEventListener('change', () => loadReports());
       monthFilter.dataset.bound = '1';
     }
 
+    if (viewModeSelect && !viewModeSelect.dataset.bound) {
+      viewModeSelect.addEventListener('change', () => loadReports());
+      viewModeSelect.dataset.bound = '1';
+    }
+
+    if (dateFilter && !dateFilter.dataset.bound) {
+      dateFilter.addEventListener('change', () => loadReports());
+      dateFilter.dataset.bound = '1';
+    }
+
     const now = new Date();
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     if (monthFilter && !monthFilter.value) monthFilter.value = currentMonth;
+    if (viewModeSelect && !viewModeSelect.value) viewModeSelect.value = 'MONTH';
+    if (dateFilter && !dateFilter.value) dateFilter.value = now.toISOString().split('T')[0];
 
     const selectedMonth = monthFilter?.value || currentMonth;
+    const viewMode = viewModeSelect?.value || 'MONTH';
+    let selectedDate = dateFilter?.value || now.toISOString().split('T')[0];
+
+    const [year, month] = selectedMonth.split('-').map((v) => Number(v));
+    const firstDay = `${selectedMonth}-01`;
+    const lastDay = `${selectedMonth}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`;
+    if (dateFilter) {
+      dateFilter.disabled = viewMode !== 'DAY';
+      dateFilter.min = firstDay;
+      dateFilter.max = lastDay;
+      if (selectedDate < firstDay || selectedDate > lastDay) {
+        selectedDate = firstDay;
+        dateFilter.value = firstDay;
+      }
+    }
+
     const report = await apiRequest(`/reports/transactions?month=${encodeURIComponent(selectedMonth)}`);
 
     if (monthLabel) {
-      const [year, month] = selectedMonth.split('-');
-      monthLabel.textContent = `Tháng ${month}/${year}`;
+      monthLabel.textContent = viewMode === 'DAY'
+        ? `Đang xem ngày ${formatDate(selectedDate)} trong tháng ${month}/${year}`
+        : `Đang xem toàn bộ tháng ${month}/${year}`;
     }
+
+    const vipByHoursMap = new Map((report?.leaderboard?.allTime?.items || []).map((item) => [item.usersId, Boolean(item.isVipByHours)]));
 
     const summary = report?.summary || {};
     const dailyRows = (report?.daily || []).map((day) => ({
@@ -1183,7 +1277,8 @@ window.loadReports = async function () {
         ? day.transactions.map((txn) => ({
           ...txn,
           amount: Number(txn.amount) || 0,
-          quantity: Number(txn.quantity) || 1
+          quantity: Number(txn.quantity) || 1,
+          isVipByHours: Boolean(vipByHoursMap.get(txn.usersId))
         }))
         : []
     }));
@@ -1191,6 +1286,10 @@ window.loadReports = async function () {
     document.getElementById('reportTotalRevenue').textContent = formatCurrency(Number(summary.totalRevenue) || 0);
     document.getElementById('reportTotalTransactions').textContent = Number(summary.totalTransactions) || 0;
     document.getElementById('reportActiveDays').textContent = Number(summary.activeDays) || 0;
+    const vipMonthEl = document.getElementById('reportVipMonthCount');
+    const vipAllEl = document.getElementById('reportVipAllTimeCount');
+    if (vipMonthEl) vipMonthEl.textContent = (report?.leaderboard?.month?.items || []).filter((i) => i.isVipByHours).length;
+    if (vipAllEl) vipAllEl.textContent = (report?.leaderboard?.allTime?.items || []).filter((i) => i.isVipByHours).length;
 
     reportDailyCache = dailyRows;
     currentReportDailyPage = 1;
@@ -1199,9 +1298,189 @@ window.loadReports = async function () {
 
     renderReportDailyTable();
     renderReportDetailByDate(currentReportSelectedDate);
+    renderRevenuePie(report?.transactions || [], { viewMode, selectedDate });
+    renderRevenueLeaderboard('reportVipMonthTbody', report?.leaderboard?.month?.items || [], 10, { onlyVip: true });
+    renderRevenueLeaderboard('reportVipAllTimeTbody', report?.leaderboard?.allTime?.items || [], 10, { onlyVip: true });
+
+    const monthTitle = document.getElementById('reportVipMonthTitle');
+    if (monthTitle) monthTitle.textContent = `BXH doanh thu tháng ${month}/${year}`;
+    const allTimeTitle = document.getElementById('reportVipAllTimeTitle');
+    if (allTimeTitle) allTimeTitle.textContent = 'BXH doanh thu tích lũy';
 
   } catch (err) { console.error(err); }
 };
+
+function renderRevenuePie(transactions, options) {
+  const viewMode = options?.viewMode || 'MONTH';
+  const selectedDate = options?.selectedDate;
+  const mainPie = document.getElementById('reportPieMain');
+  const mainLegend = document.getElementById('reportPieMainLegend');
+  const tooltip = document.getElementById('reportPieTooltip');
+  const panelTitle = document.getElementById('reportDetailPanelTitle');
+  const panelHint = document.getElementById('reportDetailPanelHint');
+  const panelBody = document.getElementById('reportDetailPanelBody');
+  if (!mainPie || !mainLegend || !tooltip || !panelTitle || !panelHint || !panelBody) return;
+
+  const scoped = (Array.isArray(transactions) ? transactions : []).filter((txn) => {
+    if (viewMode !== 'DAY') return true;
+    return String(txn.date || '').startsWith(selectedDate);
+  });
+
+  const serviceTxns = scoped.filter((t) => t.itemType === 'SERVICE');
+  const packageTxns = scoped.filter((t) => t.itemType === 'PACKAGE');
+  const totals = {
+    service: serviceTxns.reduce((sum, t) => sum + (Number(t.amount) || 0), 0),
+    package: packageTxns.reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
+  };
+  const total = totals.service + totals.package;
+
+  const serviceItems = aggregateItems(serviceTxns, 'serviceCategory');
+  const packageItems = aggregateItems(packageTxns, null);
+
+  if (total <= 0) {
+    mainPie.style.background = '#e2e8f0';
+    mainLegend.innerHTML = '<span class="report-legend-item">Không có dữ liệu</span>';
+    panelTitle.textContent = 'Chi tiết thành phần doanh thu';
+    panelHint.textContent = 'Không có dữ liệu cho bộ lọc hiện tại.';
+    panelBody.innerHTML = '';
+    tooltip.style.display = 'none';
+    mainPie.onmousemove = null;
+    mainPie.onmouseleave = null;
+    return;
+  }
+
+  const servicePct = Math.round((totals.service / total) * 100);
+  mainPie.style.background = `conic-gradient(#16a34a 0 ${servicePct}%, #f59e0b ${servicePct}% 100%)`;
+  mainPie.style.cursor = 'default';
+
+  const serviceQty = serviceItems.reduce((sum, item) => sum + item.quantity, 0);
+  const packageQty = packageItems.reduce((sum, item) => sum + item.quantity, 0);
+  mainLegend.innerHTML = `
+    <span class="report-legend-item"><span class="report-legend-dot" style="background:#16a34a"></span>Dịch vụ: ${formatCurrency(totals.service)} (${serviceQty})</span>
+    <span class="report-legend-item"><span class="report-legend-dot" style="background:#f59e0b"></span>Gói nạp: ${formatCurrency(totals.package)} (${packageQty})</span>
+  `;
+
+  panelTitle.textContent = 'Chi tiết thành phần doanh thu';
+  panelHint.textContent = 'Di chuột vào từng mảng màu để xem chi tiết dịch vụ/gói nạp.';
+  panelBody.innerHTML = '';
+
+  const showDetail = (segment) => {
+    const data = segment === 'SERVICE'
+      ? { title: 'Chi tiết Dịch vụ', items: serviceItems, total: totals.service }
+      : { title: 'Chi tiết Gói nạp', items: packageItems, total: totals.package };
+
+    panelTitle.textContent = data.title;
+    panelHint.textContent = `Tổng doanh thu: ${formatCurrency(data.total)} - Tổng số lượng: ${data.items.reduce((sum, item) => sum + item.quantity, 0)}`;
+
+    panelBody.innerHTML = data.items.length === 0
+      ? '<div class="text-muted">Không có dữ liệu chi tiết.</div>'
+      : data.items.map((item) => `
+        <div class="report-detail-item">
+          <strong>${escapeHtml(item.name)}</strong>
+          <span>${item.quantity} lượt</span>
+          <span>${formatCurrency(item.revenue)}</span>
+        </div>
+      `).join('');
+
+    tooltip.innerHTML = `
+      <div class="report-pie-tooltip-title">${data.title}</div>
+      ${data.items.slice(0, 8).map((item) => `
+        <div class="report-pie-tooltip-row">
+          <span>${escapeHtml(item.name)} x${item.quantity}</span>
+          <span>${formatCurrency(item.revenue)}</span>
+        </div>
+      `).join('')}
+    `;
+  };
+
+  showDetail('SERVICE');
+
+  mainPie.onmousemove = (event) => {
+    const rect = mainPie.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const dx = event.clientX - centerX;
+    const dy = event.clientY - centerY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const outerRadius = rect.width / 2;
+    const innerRadius = 52;
+
+    if (distance < innerRadius || distance > outerRadius) {
+      tooltip.style.display = 'none';
+      return;
+    }
+
+    const angle = (Math.atan2(dy, dx) * 180 / Math.PI + 450) % 360;
+    const serviceDeg = (servicePct / 100) * 360;
+    const segment = angle <= serviceDeg ? 'SERVICE' : 'PACKAGE';
+    showDetail(segment);
+
+    const parentRect = mainPie.parentElement.getBoundingClientRect();
+    tooltip.style.display = 'block';
+    tooltip.style.left = `${event.clientX - parentRect.left + 12}px`;
+    tooltip.style.top = `${event.clientY - parentRect.top + 12}px`;
+  };
+
+  mainPie.onmouseleave = () => {
+    tooltip.style.display = 'none';
+  };
+}
+
+function aggregateItems(transactions, categoryKey) {
+  const map = new Map();
+  (transactions || []).forEach((txn) => {
+    const category = categoryKey ? (txn[categoryKey] || 'OTHER') : '';
+    const key = `${txn.itemName || 'N/A'}::${category}`;
+    const current = map.get(key) || {
+      name: txn.itemName || 'N/A',
+      quantity: 0,
+      revenue: 0
+    };
+    current.quantity += Number(txn.quantity) || 0;
+    current.revenue += Number(txn.amount) || 0;
+    map.set(key, current);
+  });
+  return [...map.values()].sort((a, b) => b.revenue - a.revenue);
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function renderRevenueLeaderboard(tbodyId, items, maxRows = 10, options = {}) {
+  const tbody = typeof tbodyId === 'string' ? document.getElementById(tbodyId) : tbodyId;
+  if (!tbody) return;
+
+  const sourceRows = Array.isArray(items) ? items : [];
+  const filteredRows = options.onlyVip
+    ? sourceRows.filter((item) => Boolean(item.isVipByPurchasedHours || item.isVipByHours))
+    : sourceRows;
+  const rows = filteredRows.slice(0, maxRows);
+  if (rows.length === 0) {
+    tbody.innerHTML = options.onlyVip
+      ? '<tr><td colspan="4" style="text-align:center;padding:20px;">Chưa có khách đạt VIP.</td></tr>'
+      : '<tr><td colspan="4" style="text-align:center;padding:20px;">Chưa có dữ liệu xếp hạng.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map((item, idx) => {
+    const rank = Number(item.rank) || (idx + 1);
+    const rankClass = rank <= 3 ? `rank-${rank}` : '';
+    return `
+      <tr>
+        <td><span class="rank-chip ${rankClass}">#${rank}</span></td>
+        <td>${customerDisplayName(item)}</td>
+        <td style="font-weight:700;color:#16a34a;">${formatCurrency(Number(item.revenue) || 0)}</td>
+        <td>${Number(item.totalPurchasedHours ?? item.totalHoursUsed ?? 0).toFixed(2)}h</td>
+      </tr>
+    `;
+  }).join('');
+}
 
 function renderReportDailyTable() {
   const tbody = document.getElementById('reportTbody');
@@ -1284,7 +1563,7 @@ function renderReportDetail(day) {
   tbody.innerHTML = pagedTxns.map((txn) => `
     <tr>
       <td>${formatDateTime(txn.date)}</td>
-      <td>${txn.customerName || 'N/A'}</td>
+      <td>${customerDisplayName(txn)}</td>
       <td>${txn.itemName} x${txn.quantity}</td>
       <td><span class="badge ${txn.itemType === 'PACKAGE' ? 'badge-warning' : (txn.itemType === 'SERVICE' ? 'badge-info' : 'badge-danger')}">${trans(txn.itemType)}</span></td>
       <td><span class="badge ${txn.method === 'LEGACY' ? 'badge-warning' : 'badge-info'}">${trans(txn.method)}</span></td>

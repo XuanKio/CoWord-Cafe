@@ -1,6 +1,5 @@
 package org.example.cowordptit.service;
 
-import lombok.RequiredArgsConstructor;
 import org.example.cowordptit.entity.PaymentRecord;
 import org.example.cowordptit.entity.ServiceRequest;
 import org.example.cowordptit.repository.PaymentRepository;
@@ -16,11 +15,15 @@ import java.util.Locale;
 import java.util.Map;
 
 @Service
-@RequiredArgsConstructor
 public class PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final ServiceRequestRepository requestRepository;
+
+    public PaymentService(PaymentRepository paymentRepository, ServiceRequestRepository requestRepository) {
+        this.paymentRepository = paymentRepository;
+        this.requestRepository = requestRepository;
+    }
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getAll() {

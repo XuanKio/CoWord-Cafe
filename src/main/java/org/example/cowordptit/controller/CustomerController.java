@@ -1,6 +1,5 @@
 package org.example.cowordptit.controller;
 
-import lombok.RequiredArgsConstructor;
 import org.example.cowordptit.dto.request.AddHoursRequestDto;
 import org.example.cowordptit.dto.request.CreateCustomerRequestDto;
 import org.example.cowordptit.dto.request.UpdateCustomerRequestDto;
@@ -23,10 +22,13 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/customers")
-@RequiredArgsConstructor
 public class CustomerController {
 
     private final CustomerService customerService;
+
+    public CustomerController(CustomerService customerService) {
+        this.customerService = customerService;
+    }
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getAll() {

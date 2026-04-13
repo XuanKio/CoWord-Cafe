@@ -1,6 +1,5 @@
 package org.example.cowordptit.service;
 
-import lombok.RequiredArgsConstructor;
 import org.example.cowordptit.entity.Admin;
 import org.example.cowordptit.entity.Customer;
 import org.example.cowordptit.repository.AdminRepository;
@@ -14,12 +13,17 @@ import java.math.BigDecimal;
 import java.util.Map;
 
 @Service
-@RequiredArgsConstructor
 public class AuthService {
 
     private final AdminRepository adminRepository;
     private final CustomerRepository customerRepository;
     private final JwtUtil jwtUtil;
+
+    public AuthService(AdminRepository adminRepository, CustomerRepository customerRepository, JwtUtil jwtUtil) {
+        this.adminRepository = adminRepository;
+        this.customerRepository = customerRepository;
+        this.jwtUtil = jwtUtil;
+    }
 
     @Transactional(readOnly = true)
     public Map<String, Object> adminLogin(String username, String password) {

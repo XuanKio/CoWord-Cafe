@@ -1,10 +1,10 @@
 package org.example.cowordptit.service;
 
-import lombok.RequiredArgsConstructor;
 import org.example.cowordptit.entity.CafeSession;
 import org.example.cowordptit.entity.Customer;
 import org.example.cowordptit.repository.CafeSessionRepository;
 import org.example.cowordptit.repository.CustomerRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,11 +17,18 @@ import java.util.Map;
 import java.util.Optional;
 
 @Service
-@RequiredArgsConstructor
 public class CustomerService {
 
     private final CustomerRepository customerRepository;
     private final CafeSessionRepository cafeSessionRepository;
+    private final BigDecimal vipPurchasedHoursThreshold;
+
+    public CustomerService(CustomerRepository customerRepository, CafeSessionRepository cafeSessionRepository,
+            @Value("${app.vip.purchased-hours-threshold:60}") BigDecimal vipPurchasedHoursThreshold) {
+        this.customerRepository = customerRepository;
+        this.cafeSessionRepository = cafeSessionRepository;
+        this.vipPurchasedHoursThreshold = vipPurchasedHoursThreshold;
+    }
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getAll() {
@@ -109,6 +116,26 @@ public class CustomerService {
 
     private Map<String, Object> toMap(Customer customer) {
         BigDecimal remaining = customer.getRemainingHours();
+        BigDecimal totalHoursUsed = BigDecimal.ZERO;
+        BigDecimal realtimeOngoingHours = BigDecimal.ZERO;
+
+        for (CafeSession session : cafeSessionRepository.findByCustomer_UsersId(customer.getUsersId())) {
+            if (session.getStatus() == CafeSession.SessionStatus.ONGOING && session.getCheckIn() != null) {
+                long mins = Duration.between(session.getCheckIn(), LocalDateTime.now()).toMinutes();
+                if (mins > 0) {
+                    realtimeOngoingHours = realtimeOngoingHours.add(
+                            BigDecimal.valueOf(mins).divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP));
+                }
+                continue;
+            }
+            if (session.getHoursUsed() != null && session.getHoursUsed().compareTo(BigDecimal.ZERO) > 0) {
+                totalHoursUsed = totalHoursUsed.add(session.getHoursUsed());
+            }
+        }
+
+        totalHoursUsed = totalHoursUsed.add(realtimeOngoingHours).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalPurchasedHours = remaining.add(totalHoursUsed).setScale(2, RoundingMode.HALF_UP);
+        boolean isVipByPurchasedHours = totalPurchasedHours.compareTo(vipPurchasedHoursThreshold) >= 0;
 
         cafeSessionRepository.findByCustomer_UsersIdAndStatus(customer.getUsersId(), CafeSession.SessionStatus.ONGOING)
                 .ifPresent(session -> {
@@ -126,6 +153,10 @@ public class CustomerService {
                 "name", customer.getName(),
                 "phone", customer.getPhone(),
                 "remainingHours", customer.getRemainingHours(),
+                "totalHoursUsed", totalHoursUsed,
+                "totalPurchasedHours", totalPurchasedHours,
+                "isVipByHours", isVipByPurchasedHours,
+                "isVipByPurchasedHours", isVipByPurchasedHours,
                 "status", normalizeStatus(customer.getStatus()).name(),
                 "createdAt", customer.getCreatedAt().toString());
     }
