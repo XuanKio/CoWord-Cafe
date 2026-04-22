@@ -66,6 +66,7 @@ let currentOrderFilter = 'ALL';
 let currentOrderPage = 1;
 const ORDERS_PAGE_SIZE = 8;
 let currentOrderModalId = null;
+let orderDetailActionPending = null;
 
 // ===== UTILITIES =====
 function formatCurrency(amount) {
@@ -1154,6 +1155,18 @@ function bindOrderModalEvents() {
 }
 
 window.approveOrder = async function (id) {
+  const detailOverlay = document.getElementById('orderDetailModalOverlay');
+  const detailIsOpen = Boolean(detailOverlay && !detailOverlay.classList.contains('hidden'));
+  if (detailIsOpen && orderDetailActionPending !== 'approve') {
+    orderDetailActionPending = 'approve';
+    closeOrderDetailModal();
+    window.requestAnimationFrame(() => {
+      orderDetailActionPending = null;
+      window.approveOrder?.(id);
+    });
+    return;
+  }
+
   openActionModal({
     title: 'Duyệt yêu cầu',
     message: 'Xác nhận duyệt yêu cầu này và ghi nhận giao dịch thanh toán?',
@@ -1188,6 +1201,18 @@ window.approveOrder = async function (id) {
 }
 
 window.cancelOrder = async function (id) {
+  const detailOverlay = document.getElementById('orderDetailModalOverlay');
+  const detailIsOpen = Boolean(detailOverlay && !detailOverlay.classList.contains('hidden'));
+  if (detailIsOpen && orderDetailActionPending !== 'cancel') {
+    orderDetailActionPending = 'cancel';
+    closeOrderDetailModal();
+    window.requestAnimationFrame(() => {
+      orderDetailActionPending = null;
+      window.cancelOrder?.(id);
+    });
+    return;
+  }
+
   openActionModal({
     title: 'Từ chối yêu cầu',
     message: 'Bạn chắc chắn muốn từ chối/hủy yêu cầu này?',
