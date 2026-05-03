@@ -36,7 +36,7 @@ public class AuthService {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Mật khẩu không đúng");
         }
 
-        String token = jwtUtil.generateToken(admin.getUsername(), "ADMIN");
+        String token = jwtUtil.generateToken(admin.getUsername(), "ADMIN", null);
         return Map.of(
                 "token", token,
                 "admin", Map.of(
@@ -74,7 +74,7 @@ public class AuthService {
             throw new ApiException(HttpStatus.FORBIDDEN, "Bạn đã hết thời gian sử dụng dịch vụ, hãy ra quầy để nạp");
         }
 
-        String token = jwtUtil.generateToken(customer.getPhone(), "USER");
+        String token = jwtUtil.generateToken(customer.getPhone(), "USER", customer.getUsersId());
         return Map.of(
                 "token", token,
                 "customer", Map.of(

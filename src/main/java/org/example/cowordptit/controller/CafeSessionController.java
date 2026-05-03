@@ -10,14 +10,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
-/**
- * CafeSessionController — Quản lý phiên ngồi
- * GET /api/sessions → tất cả phiên (admin)
- * GET /api/sessions/customer/{id} → phiên theo khách
- * GET /api/sessions/active → phiên đang diễn ra
- * POST /api/sessions/checkin → check-in khách
- * PUT /api/sessions/{id}/checkout → check-out, tính giờ
- */
 @RestController
 @RequestMapping("/api/sessions")
 public class CafeSessionController {
@@ -43,21 +35,18 @@ public class CafeSessionController {
         return ResponseEntity.ok(ApiResponse.success(cafeSessionService.getSessionsByCustomer(customerId)));
     }
 
-    @PostMapping("/checkin")
+    @PostMapping({ "", "/checkin" })
     public ResponseEntity<ApiResponse<Map<String, Object>>> checkIn(@RequestBody CheckInRequest req) {
         Map<String, Object> session = cafeSessionService.checkIn(req.getUsersId());
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Check-in thành công", session));
+                .body(ApiResponse.success("Check-in thanh cong", session));
     }
 
-    /**
-     * Check-out: kết thúc phiên, tính giờ đã dùng và trừ vào remaining_hours
-     */
-    @PutMapping("/{id}/checkout")
+    @RequestMapping(path = "/{id}/checkout", method = { RequestMethod.PUT, RequestMethod.PATCH })
     public ResponseEntity<ApiResponse<Map<String, Object>>> checkOut(@PathVariable Long id) {
         return cafeSessionService.checkOut(id)
-                .map(session -> ResponseEntity.ok(ApiResponse.success("Check-out thành công", session)))
+                .map(session -> ResponseEntity.ok(ApiResponse.success("Check-out thanh cong", session)))
                 .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(ApiResponse.error("Không tìm thấy phiên ngồi")));
+                        .body(ApiResponse.error("Khong tim thay phien ngoi")));
     }
 }

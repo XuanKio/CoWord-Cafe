@@ -1,0 +1,87 @@
+{
+  "info": {
+    "name": "CoWord RESTful Routes",
+    "_postman_id": "6fa65ecf-82db-47db-b19d-0f5bca931b1f",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth User Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/auth/user",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"{{userPhone}}\",\n  \"password\": \"{{userPassword}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Get User By Id",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": "{{baseUrl}}/api/users/{{targetUserId}}"
+      }
+    },
+    {
+      "name": "Get User Sessions",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": "{{baseUrl}}/api/users/{{targetUserId}}/sessions"
+      }
+    },
+    {
+      "name": "Get User Requests",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": "{{baseUrl}}/api/users/{{targetUserId}}/requests"
+      }
+    },
+    {
+      "name": "Create Session (Admin)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/sessions",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"usersId\": {{targetUserId}}\n}"
+        }
+      }
+    },
+    {
+      "name": "Checkout Session (PATCH)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/sessions/{{sessionId}}/checkout"
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "token", "value": "" },
+    { "key": "adminToken", "value": "" },
+    { "key": "userPhone", "value": "0911111111" },
+    { "key": "userPassword", "value": "user123" },
+    { "key": "targetUserId", "value": "1" },
+    { "key": "sessionId", "value": "1" }
+  ]
+}

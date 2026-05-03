@@ -10,17 +10,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
-/**
- * ServiceRequestController — Yêu cầu gọi dịch vụ hoặc mua gói giờ
- *
- * POST /api/requests → user tạo yêu cầu
- * GET /api/requests → tất cả (admin)
- * GET /api/requests/pending → yêu cầu chờ duyệt
- * GET /api/requests/customer/{id} → yêu cầu theo khách
- * PATCH /api/requests/{id}/approve → admin duyệt (PENDING → APPROVED), nạp giờ
- * nếu là gói
- * PATCH /api/requests/{id}/cancel → huỷ yêu cầu
- */
 @RestController
 @RequestMapping("/api/requests")
 public class ServiceRequestController {
@@ -59,7 +48,6 @@ public class ServiceRequestController {
                 serviceRequestService.search(q, keyword, customerName, namesOnly, status, usersId, type)));
     }
 
-    /** Tạo yêu cầu mới (user gọi) */
     @PostMapping
     public ResponseEntity<ApiResponse<Map<String, Object>>> create(@RequestBody CreateServiceRequestDto req) {
         Map<String, Object> item = serviceRequestService.create(
@@ -69,28 +57,22 @@ public class ServiceRequestController {
                 req.getPackagesId(),
                 req.getQuantity());
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Tạo yêu cầu thành công", item));
+                .body(ApiResponse.success("Tao yeu cau thanh cong", item));
     }
 
-    /**
-     * Admin duyệt yêu cầu:
-     * - Nếu là gói giờ: cộng giờ vào remaining_hours của khách
-     * - Đổi status → APPROVED
-     */
     @PatchMapping("/{id}/approve")
     public ResponseEntity<ApiResponse<Map<String, Object>>> approve(@PathVariable Long id) {
         return serviceRequestService.approve(id)
-                .map(item -> ResponseEntity.ok(ApiResponse.success("Duyệt yêu cầu thành công", item)))
+                .map(item -> ResponseEntity.ok(ApiResponse.success("Duyet yeu cau thanh cong", item)))
                 .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(ApiResponse.error("Không tìm thấy yêu cầu")));
+                        .body(ApiResponse.error("Khong tim thay yeu cau")));
     }
 
-    /** Huỷ yêu cầu */
     @PatchMapping("/{id}/cancel")
     public ResponseEntity<ApiResponse<Map<String, Object>>> cancel(@PathVariable Long id) {
         return serviceRequestService.cancel(id)
-                .map(item -> ResponseEntity.ok(ApiResponse.success("Hủy yêu cầu thành công", item)))
+                .map(item -> ResponseEntity.ok(ApiResponse.success("Huy yeu cau thanh cong", item)))
                 .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(ApiResponse.error("Không tìm thấy yêu cầu")));
+                        .body(ApiResponse.error("Khong tim thay yeu cau")));
     }
 }

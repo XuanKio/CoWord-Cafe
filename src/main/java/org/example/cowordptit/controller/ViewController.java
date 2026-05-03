@@ -8,21 +8,31 @@ public class ViewController {
 
     @GetMapping("/")
     public String index() {
-        return "forward:/login";
+        return "redirect:/login";
     }
 
     @GetMapping("/login")
     public String login() {
-        return "login.html";
+        return "forward:/login.html";
     }
 
     @GetMapping("/admin")
+    public String adminAlias() {
+        return "redirect:/app/admin/dashboard";
+    }
+
+    @GetMapping({ "/app/admin", "/app/admin/{section}" })
     public String admin() {
-        return "admin.html";
+        return "forward:/admin.html";
     }
 
     @GetMapping("/user")
+    public String userAlias() {
+        return "redirect:/app/me";
+    }
+
+    @GetMapping({ "/app/me", "/app/users/{id}" })
     public String user() {
-        return "user.html";
+        return "forward:/user.html";
     }
 }

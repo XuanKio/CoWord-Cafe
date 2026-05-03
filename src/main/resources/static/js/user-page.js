@@ -5,6 +5,8 @@
 
 import { customerApi, menuApi, packageApi, serviceRequestApi, sessionApi } from './api.js';
 const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+const pathMatch = window.location.pathname.match(/^\/app\/users\/(\d+)$/);
+const targetUserId = pathMatch ? Number(pathMatch[1]) : Number(currentUser.usersId);
 
 // ===== DOM =====
 const welcomeName = document.getElementById('welcomeName');
@@ -24,11 +26,6 @@ let currentFoodPage = 1;
 
 // ===== Khởi tạo =====
 function init() {
-  if (!currentUser.token || currentUser.role !== 'USER') {
-    window.location.href = '/login';
-    return;
-  }
-
   if (dashboardSection) dashboardSection.style.display = 'block';
   if (btnLogout) btnLogout.style.display = 'inline-flex';
   if (welcomeName) welcomeName.textContent = currentUser.name || 'Khách';
@@ -43,23 +40,22 @@ function init() {
 if (btnLogout) {
   btnLogout.addEventListener('click', () => {
     localStorage.removeItem('user');
-    window.location.href = '/login.html';
+    window.location.href = '/login';
   });
 }
 
 // ===== Thông tin tài khoản =====
 async function loadMyInfo() {
-  if (!currentUser.usersId) return;
+  if (!targetUserId) return;
   const panel = document.getElementById('userInfoPanel');
 
   try {
-    const data = await customerApi.getById(currentUser.usersId);
+    const data = await customerApi.getById(targetUserId);
     localStorage.setItem('user', JSON.stringify({ ...currentUser, remainingHours: data.remainingHours, status: data.status }));
     renderUserInfo(data);
   } catch (e) {
     if (e.status === 404) {
-      if (panel) panel.innerHTML = '<p style="color:#b91c1c">Tai khoan khong tim thay. Dang dang xuat...</p>';
-      setTimeout(() => { localStorage.removeItem('user'); window.location.href = '/login'; }, 2500);
+      if (panel) panel.innerHTML = `<p style="color:#b91c1c">Khong tim thay user ID ${targetUserId}.</p>`;
       return;
     }
     console.error('Lỗi tải thông tin:', e);
@@ -103,11 +99,11 @@ function renderUserInfo(data) {
 // ===== Lịch sử phiên =====
 async function loadMySessions() {
   const container = document.getElementById('myBookingsList');
-  if (!container || !currentUser.usersId) return;
+  if (!container || !targetUserId) return;
   container.innerHTML = renderSkeleton();
 
   try {
-    const sessions = await sessionApi.getByCustomer(currentUser.usersId);
+    const sessions = await sessionApi.getByCustomer(targetUserId);
     sessionsCache = (sessions || []).sort((a, b) => new Date(b.checkIn) - new Date(a.checkIn));
     currentSessionPage = 1;
     renderSessionList();
@@ -167,10 +163,10 @@ let activeSessionId = null;
 const cart = {};
 
 async function loadOrderPanel() {
-  if (!currentUser.usersId) return;
+  if (!targetUserId) return;
 
   try {
-    const sessions = await sessionApi.getByCustomer(currentUser.usersId);
+    const sessions = await sessionApi.getByCustomer(targetUserId);
     const ongoing = sessions.find((s) => s.status === 'ONGOING');
     activeSessionId = ongoing ? ongoing.sessionsId : null;
 
@@ -421,7 +417,7 @@ window.submitOrder = async function () {
   for (const [key, quantity] of items) {
     const isPkg = key.startsWith('pkg_');
     const id = parseInt(key.slice(4));
-    const body = { usersId: currentUser.usersId, quantity };
+    const body = { usersId: targetUserId, quantity };
     if (isPkg) body.packagesId = id;
     else { body.servicesId = id; if (activeSessionId) body.sessionsId = activeSessionId; }
 

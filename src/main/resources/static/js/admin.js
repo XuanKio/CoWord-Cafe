@@ -2,22 +2,44 @@ import { apiRequest } from './api.js';
 
 // Auth check — chỉ ADMIN mới được vào
 const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-if (currentUser.role !== 'ADMIN' || !currentUser.token) {
+if (!currentUser.token) {
   localStorage.removeItem('user');
-  window.location.href = '/login.html';
+  window.location.href = '/login';
 }
 
 document.getElementById('adminName').textContent = currentUser.username || currentUser.name || 'Admin';
+
+const ADMIN_BASE_PATH = '/app/admin';
+const VALID_SECTIONS = ['dashboard', 'customers', 'checkin', 'services', 'packages', 'orders', 'reports'];
 
 // Navigation
 document.querySelectorAll('.menu-item[data-section]').forEach(item => {
   item.addEventListener('click', () => {
     const sectionId = item.dataset.section;
-    showSection(sectionId);
+    showSection(sectionId, { updateUrl: true });
   });
 });
 
-function showSection(sectionId) {
+function sectionFromPath(pathname) {
+  if (!pathname.startsWith(ADMIN_BASE_PATH)) return null;
+  const suffix = pathname.slice(ADMIN_BASE_PATH.length).replace(/^\/+/, '');
+  if (!suffix) return 'dashboard';
+  return VALID_SECTIONS.includes(suffix) ? suffix : null;
+}
+
+function updateSectionPath(sectionId, replace = false) {
+  const nextPath = `${ADMIN_BASE_PATH}/${sectionId}`;
+  if (window.location.pathname === nextPath) return;
+  if (replace) history.replaceState(null, '', nextPath);
+  else history.pushState(null, '', nextPath);
+}
+
+function showSection(sectionId, options = {}) {
+  const { updateUrl = false, replaceUrl = false } = options;
+  if (!VALID_SECTIONS.includes(sectionId)) {
+    sectionId = 'dashboard';
+  }
+
   // Update nav items
   document.querySelectorAll('.menu-item').forEach(item => item.classList.remove('active'));
   document.querySelector(`[data-section="${sectionId}"]`)?.classList.add('active');
@@ -45,6 +67,10 @@ function showSection(sectionId) {
   if (sectionId === 'packages') loadPackages();
   if (sectionId === 'orders') loadOrders();
   if (sectionId === 'reports') loadReports();
+
+  if (updateUrl) {
+    updateSectionPath(sectionId, replaceUrl);
+  }
 }
 
 // Global caching mappings
@@ -222,7 +248,7 @@ window.closeActionModal = function () {
 
 window.logout = function () {
   localStorage.removeItem('user');
-  window.location.href = '/login.html';
+  window.location.href = '/login';
 };
 
 
@@ -234,7 +260,7 @@ window.loadDashboard = async function () {
 
     const [sessions, customers, requests, payments, reportData] = await Promise.all([
       apiRequest('/sessions'),
-      apiRequest('/customers'),
+      apiRequest('/users'),
       apiRequest('/requests'),
       apiRequest('/payments'),
       apiRequest(`/reports/transactions?month=${encodeURIComponent(currentMonth)}`)
@@ -328,7 +354,7 @@ window.loadCheckinSection = async function () {
 
   try {
     const sessions = await apiRequest('/sessions');
-    const customers = await apiRequest('/customers');
+    const customers = await apiRequest('/users');
     customers.forEach(c => allCustomersMap[c.usersId] = c);
 
     const activeSessions = sessions.filter(s => s.status === 'ONGOING');
@@ -379,7 +405,7 @@ document.getElementById('btnSearchCheckin').addEventListener('click', async () =
   resContainer.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i></div>`;
 
   try {
-    const customers = await apiRequest('/customers');
+    const customers = await apiRequest('/users');
     const normalizedKeyword = normalizeText(keyword);
     const numericKeyword = normalizePhone(keyword);
     const isNumericOnly = /^\d+$/.test(keyword);
@@ -429,7 +455,7 @@ window.doCheckIn = async function (usersId) {
     confirmClass: 'btn-primary',
     onConfirm: async () => {
       try {
-        await apiRequest('/sessions/checkin', {
+        await apiRequest('/sessions', {
           method: 'POST',
           body: JSON.stringify({ usersId: parseInt(usersId) })
         });
@@ -472,7 +498,7 @@ window.doCheckOut = async function (sessionId) {
 // ===== CUSTOMERS SECTION =====
 window.loadCustomers = async function () {
   try {
-    const customers = await apiRequest('/customers');
+    const customers = await apiRequest('/users');
     allCustomersCache = customers || [];
     allCustomersMap = {};
     customers.forEach(c => allCustomersMap[c.usersId] = c);
@@ -598,7 +624,7 @@ window.submitAddHours = async function () {
     confirmText: 'Nạp giờ',
     onConfirm: async () => {
       try {
-        await apiRequest(`/customers/${id}/add-hours`, {
+        await apiRequest(`/users/${id}/add-hours`, {
           method: 'PATCH',
           body: JSON.stringify({ hours: hours, note: 'Nạp thủ công' })
         });
@@ -654,7 +680,7 @@ window.deleteCustomer = async function (id) {
     confirmClass: 'btn-danger',
     onConfirm: async () => {
       try {
-        await apiRequest(`/customers/${id}`, { method: 'DELETE' });
+        await apiRequest(`/users/${id}`, { method: 'DELETE' });
         closeActionModal();
         await loadCustomers();
         await loadDashboard();
@@ -691,12 +717,12 @@ window.saveCustomer = async function () {
     onConfirm: async () => {
       try {
         if (id) {
-          await apiRequest(`/customers/${id}`, {
+          await apiRequest(`/users/${id}`, {
             method: 'PUT',
             body: JSON.stringify({ name, phone, password: pw, status: status })
           });
         } else {
-          await apiRequest('/customers', {
+          await apiRequest('/users', {
             method: 'POST',
             body: JSON.stringify({ name, phone, password: pw })
           });
@@ -1675,5 +1701,10 @@ window.gotoReportDetailPage = function (page) {
   renderReportDetail(day);
 };
 
-// Initial calls
-loadDashboard();
+window.addEventListener('popstate', () => {
+  const activeSection = sectionFromPath(window.location.pathname) || 'dashboard';
+  showSection(activeSection, { updateUrl: false });
+});
+
+const initialSection = sectionFromPath(window.location.pathname) || 'dashboard';
+showSection(initialSection, { updateUrl: true, replaceUrl: true });

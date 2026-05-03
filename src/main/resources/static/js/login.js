@@ -9,11 +9,12 @@ function initLoginPage() {
   const userAuth = getUserAuth();
 
   if (authUser) {
-    window.location.href = '/admin';
+    window.location.href = '/app/admin/dashboard';
     return;
   }
   if (userAuth) {
-    window.location.href = '/user';
+    const target = userAuth.usersId ? `/app/users/${userAuth.usersId}` : '/app/me';
+    window.location.href = target;
     return;
   }
 
@@ -32,14 +33,15 @@ function initLoginPage() {
       // Try admin login first
       const adminResult = await login(username, password);
       if (adminResult?.success) {
-        window.location.href = '/admin';
+        window.location.href = '/app/admin/dashboard';
         return;
       }
 
       // Try user login
       const userResult = await loginUserWithPassword(username, password);
       if (userResult.success) {
-        window.location.href = '/user';
+        const userId = userResult.user?.usersId;
+        window.location.href = userId ? `/app/users/${userId}` : '/app/me';
       } else {
         showError(userResult.message || adminResult?.message || 'Tên đăng nhập hoặc mật khẩu không đúng.');
         document.getElementById('loginPassword').value = '';

@@ -100,16 +100,6 @@
   </main>
 
 
-  <!-- Role Guard: ch\u1ec9 USER m\u1edbi \u0111\u01b0\u1ee3c v\u00e0o trang n\u00e0y -->
-  <script>
-    (function () {
-      var u = JSON.parse(localStorage.getItem('user') || '{}');
-      if (u.role !== 'USER' || !u.token) {
-        localStorage.removeItem('user');
-        window.location.href = '/login.html';
-      }
-    })();
-  </script>
   <script type="module" src="/js/user-page.js"></script>
 </body>
 

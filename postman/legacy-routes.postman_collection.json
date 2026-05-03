@@ -1,0 +1,60 @@
+{
+  "info": {
+    "name": "CoWord Legacy Routes",
+    "_postman_id": "d3f691ef-8c24-4598-b84d-a1d67a31ed0b",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth User Login (Legacy)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/auth/user",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"{{userPhone}}\",\n  \"password\": \"{{userPassword}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Get Customer By Id (Legacy)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": "{{baseUrl}}/api/customers/{{targetUserId}}"
+      }
+    },
+    {
+      "name": "Get Sessions By Customer (Legacy)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": "{{baseUrl}}/api/sessions/customer/{{targetUserId}}"
+      }
+    },
+    {
+      "name": "Get Requests By Customer (Legacy)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": "{{baseUrl}}/api/requests/customer/{{targetUserId}}"
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "token", "value": "" },
+    { "key": "userPhone", "value": "0911111111" },
+    { "key": "userPassword", "value": "user123" },
+    { "key": "targetUserId", "value": "1" }
+  ]
+}

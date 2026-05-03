@@ -35,9 +35,11 @@ public class JwtFilter extends OncePerRequestFilter {
             if (jwtUtil.validateToken(token)) {
                 String username = jwtUtil.extractUsername(token);
                 String role = jwtUtil.extractRole(token);
+                Long userId = jwtUtil.extractUserId(token);
+                AuthenticatedUser principal = new AuthenticatedUser(username, role, userId);
                 
                 UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
-                    username,
+                    principal,
                     null,
                     Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role))
                 );

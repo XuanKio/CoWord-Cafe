@@ -3,7 +3,6 @@ package org.example.cowordptit.config;
 import org.example.cowordptit.security.JwtFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -29,43 +28,16 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(ex -> ex
+                    .authenticationEntryPoint((request, response, authException) ->
+                            response.sendError(401, "Unauthorized"))
+                    .accessDeniedHandler((request, response, accessDeniedException) ->
+                            response.sendError(403, "Forbidden")))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
-                    "/", "/login", "/admin", "/user", "/index.html", "/*.html",
+                    "/", "/login", "/admin", "/user", "/app/**", "/index.html", "/*.html",
                     "/css/**", "/js/**", "/images/**", "/favicon.ico", "/error"
                 ).permitAll()
-                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api", "/api/health").permitAll()
-
-                .requestMatchers(HttpMethod.GET, "/api/customers/*").hasAnyRole("USER", "ADMIN")
-                .requestMatchers(HttpMethod.POST, "/api/requests").hasAnyRole("USER", "ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/requests/customer/**").hasAnyRole("USER", "ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/requests/search").hasAnyRole("USER", "ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/sessions/customer/**").hasAnyRole("USER", "ADMIN")
-
-                .requestMatchers(HttpMethod.GET, "/api/packages/**", "/api/menu/**").hasAnyRole("USER", "ADMIN")
-
-                .requestMatchers(HttpMethod.GET, "/api/customers").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.POST, "/api/customers").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PUT, "/api/customers/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PATCH, "/api/customers/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/customers/**").hasRole("ADMIN")
-
-                .requestMatchers(HttpMethod.POST, "/api/packages/**", "/api/menu/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PUT, "/api/packages/**", "/api/menu/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/packages/**", "/api/menu/**").hasRole("ADMIN")
-
-                .requestMatchers(HttpMethod.GET, "/api/sessions", "/api/sessions/active").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.POST, "/api/sessions/checkin").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PUT, "/api/sessions/*/checkout").hasRole("ADMIN")
-
-                .requestMatchers(HttpMethod.GET, "/api/requests", "/api/requests/pending").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PATCH, "/api/requests/*/approve", "/api/requests/*/cancel").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/reports/**").hasRole("ADMIN")
-                .requestMatchers("/api/payments/**").hasRole("ADMIN")
-
-                .requestMatchers("/api/**").authenticated()
                 .anyRequest().permitAll()
             )
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);

@@ -20,11 +20,12 @@ function clearAuth() {
 function redirectIfLoggedIn() {
   const user = getUser();
   if (user.role === 'ADMIN' && user.token) {
-    window.location.href = '/admin.html';
+    window.location.href = '/app/admin/dashboard';
     return true;
   }
   if (user.role === 'USER' && user.token) {
-    window.location.href = '/user.html';
+    const target = user.usersId ? `/app/users/${user.usersId}` : '/app/me';
+    window.location.href = target;
     return true;
   }
   if ((user.role === 'ADMIN' || user.role === 'USER') && !user.token) {
@@ -103,7 +104,7 @@ async function handleLogin(event) {
     try {
       const adminData = await authApi.adminLogin(username, password);
       saveAdminSession(adminData);
-      window.location.href = '/admin.html';
+      window.location.href = '/app/admin/dashboard';
       return;
     } catch (adminError) {
       if (adminError?.status && adminError.status !== 401) {
@@ -114,7 +115,7 @@ async function handleLogin(event) {
 
     const userData = await authApi.userLogin(username, password);
     saveUserSession(userData);
-    window.location.href = '/user.html';
+    window.location.href = `/app/users/${userData.customer.usersId}`;
     return;
   } catch (error) {
     showError(error?.message || adminErrorMessage || 'Khong the ket noi den server. Vui long thu lai.');

@@ -14,12 +14,6 @@ function clearAuth() {
   sessionStorage.removeItem('cwc_user');
 }
 
-function redirectToLogin() {
-  if (window.location.pathname !== '/login' && window.location.pathname !== '/login.html') {
-    window.location.href = '/login';
-  }
-}
-
 function shouldSetJsonContentType(body, headers) {
   if (!body) return false;
   if (body instanceof FormData) return false;
@@ -61,7 +55,6 @@ export async function apiRequest(endpoint, options = {}) {
 
     if (response.status === 401 || response.status === 403) {
       clearAuth();
-      redirectToLogin();
     }
 
     const error = new Error(errMsg);
@@ -104,15 +97,15 @@ export const authApi = {
 
 // ===== CUSTOMERS =====
 export const customerApi = {
-  getAll: () => apiRequest('/customers'),
-  getById: (id) => apiRequest(`/customers/${id}`),
-  create: (data) => apiRequest('/customers', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id, data) => apiRequest(`/customers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  addHours: (id, hours, note = '') => apiRequest(`/customers/${id}/add-hours`, {
+  getAll: () => apiRequest('/users'),
+  getById: (id) => apiRequest(`/users/${id}`),
+  create: (data) => apiRequest('/users', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id, data) => apiRequest(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  addHours: (id, hours, note = '') => apiRequest(`/users/${id}/add-hours`, {
     method: 'PATCH',
     body: JSON.stringify({ hours, note })
   }),
-  delete: (id) => apiRequest(`/customers/${id}`, { method: 'DELETE' }),
+  delete: (id) => apiRequest(`/users/${id}`, { method: 'DELETE' }),
 };
 
 // ===== PACKAGES (Gói giờ) =====
@@ -139,19 +132,19 @@ export const menuApi = {
 export const sessionApi = {
   getAll: () => apiRequest('/sessions'),
   getActive: () => apiRequest('/sessions/active'),
-  getByCustomer: (customerId) => apiRequest(`/sessions/customer/${customerId}`),
-  create: (data) => apiRequest('/sessions/checkin', { method: 'POST', body: JSON.stringify(data) }),
-  update: (sessionId) => apiRequest(`/sessions/${sessionId}/checkout`, { method: 'PUT' }),
+  getByCustomer: (customerId) => apiRequest(`/users/${customerId}/sessions`),
+  create: (data) => apiRequest('/sessions', { method: 'POST', body: JSON.stringify(data) }),
+  update: (sessionId) => apiRequest(`/sessions/${sessionId}/checkout`, { method: 'PATCH' }),
   checkIn: (usersId) =>
-    apiRequest('/sessions/checkin', { method: 'POST', body: JSON.stringify({ usersId }) }),
-  checkOut: (sessionId) => apiRequest(`/sessions/${sessionId}/checkout`, { method: 'PUT' }),
+    apiRequest('/sessions', { method: 'POST', body: JSON.stringify({ usersId }) }),
+  checkOut: (sessionId) => apiRequest(`/sessions/${sessionId}/checkout`, { method: 'PATCH' }),
 };
 
 // ===== SERVICE REQUESTS (Yêu cầu dịch vụ / gói giờ) =====
 export const serviceRequestApi = {
   getAll: () => apiRequest('/requests'),
   getPending: () => apiRequest('/requests/pending'),
-  getByCustomer: (customerId) => apiRequest(`/requests/customer/${customerId}`),
+  getByCustomer: (customerId) => apiRequest(`/users/${customerId}/requests`),
   create: (data) => apiRequest('/requests', { method: 'POST', body: JSON.stringify(data) }),
   approve: (id) => apiRequest(`/requests/${id}/approve`, { method: 'PATCH' }),
   cancel: (id) => apiRequest(`/requests/${id}/cancel`, { method: 'PATCH' }),
