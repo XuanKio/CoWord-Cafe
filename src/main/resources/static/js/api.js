@@ -163,7 +163,12 @@ export const serviceOrderApi = {
   create: (data) => apiRequest('/requests', { method: 'POST', body: JSON.stringify(data) }),
   createPackageRequest: (data) => apiRequest('/requests', {
     method: 'POST',
-    body: JSON.stringify({ usersId: data.customerId, packagesId: data.packageId, quantity: data.quantity ?? 1 })
+    body: JSON.stringify({
+      usersId: data.customerId,
+      packagesId: data.packageId,
+      quantity: data.quantity ?? 1,
+      price: data.price ?? data.pricePaid
+    })
   }),
   updateStatus: async (id, status) => {
     if (status === 'serving') {

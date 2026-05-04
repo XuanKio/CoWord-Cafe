@@ -310,6 +310,7 @@ function renderServiceList(type) {
 function renderOrderItemCard({ key, name, price, subtitle }) {
   return `
     <div class="order-item-card">
+      <input type="hidden" id="hiddenPrice-${key}" value="${Number(price) || 0}">
       <div class="order-item-name">${name}</div>
       <div class="order-item-price">${formatCurrency(price)}</div>
       <div class="order-item-sub">${subtitle}</div>
@@ -417,7 +418,12 @@ window.submitOrder = async function () {
   for (const [key, quantity] of items) {
     const isPkg = key.startsWith('pkg_');
     const id = parseInt(key.slice(4));
+    const hiddenPrice = Number(document.getElementById(`hiddenPrice-${key}`)?.value ?? 0);
     const body = { usersId: targetUserId, quantity };
+    const safePrice = Number.isFinite(hiddenPrice) ? hiddenPrice : 0;
+    body.price = safePrice;
+    body.unitPrice = safePrice;
+    body.hiddenPrice = safePrice;
     if (isPkg) body.packagesId = id;
     else { body.servicesId = id; if (activeSessionId) body.sessionsId = activeSessionId; }
 

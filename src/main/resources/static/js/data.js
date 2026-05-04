@@ -281,9 +281,12 @@ export async function getServiceOrders() {
 }
 
 export async function createServiceOrder(order) {
+  const qty = Math.max(1, toNumber(order.quantity, 1));
+  const fallbackPrice = qty > 0 ? toNumber(order.totalPrice, 0) / qty : 0;
   const payload = {
     usersId: Number(order.customerId),
-    quantity: Math.max(1, toNumber(order.quantity, 1)),
+    quantity: qty,
+    price: toNumber(order.unitPrice, fallbackPrice),
   };
 
   if (order.sessionId != null && String(order.sessionId) !== '') {

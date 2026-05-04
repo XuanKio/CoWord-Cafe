@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.math.BigDecimal;
 
 @RestController
 @RequestMapping("/api/requests")
@@ -50,12 +51,21 @@ public class ServiceRequestController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<Map<String, Object>>> create(@RequestBody CreateServiceRequestDto req) {
+        BigDecimal resolvedPrice = req.getPrice();
+        if (resolvedPrice == null) {
+            resolvedPrice = req.getUnitPrice();
+        }
+        if (resolvedPrice == null) {
+            resolvedPrice = req.getHiddenPrice();
+        }
+
         Map<String, Object> item = serviceRequestService.create(
                 req.getUsersId(),
                 req.getSessionsId(),
                 req.getServicesId(),
                 req.getPackagesId(),
-                req.getQuantity());
+                req.getQuantity(),
+                resolvedPrice);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Tao yeu cau thanh cong", item));
     }

@@ -1,7 +1,7 @@
 package org.example.cowordptit.service;
 
-import org.example.cowordptit.entity.MenuIItem;
 import org.example.cowordptit.entity.Customer;
+import org.example.cowordptit.entity.MenuIItem;
 import org.example.cowordptit.entity.ServiceRequest;
 import org.example.cowordptit.entity.TimePackage;
 import org.example.cowordptit.repository.CafeServiceRepository;
@@ -127,10 +127,17 @@ public class ServiceRequestService {
     }
 
     @Transactional
-    public Map<String, Object> create(Long usersId, Long sessionsId, Long servicesId, Long packagesId, Integer quantity) {
+    public Map<String, Object> create(Long usersId, Long sessionsId, Long servicesId, Long packagesId, Integer quantity,
+            BigDecimal price) {
         Customer customer = customerRepository.findById(usersId).orElse(null);
         if (customer == null) {
-            throw new IllegalArgumentException("Khách hàng không tồn tại");
+            throw new IllegalArgumentException("Khach hang khong ton tai");
+        }
+        if (price == null) {
+            throw new IllegalArgumentException("Price khong duoc de trong");
+        }
+        if (price.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Price khong duoc am");
         }
 
         ServiceRequest serviceRequest = new ServiceRequest();
@@ -146,19 +153,19 @@ public class ServiceRequestService {
         if (servicesId != null) {
             MenuIItem service = cafeServiceRepository.findById(servicesId).orElse(null);
             if (service == null) {
-                throw new IllegalArgumentException("Dịch vụ không tồn tại");
+                throw new IllegalArgumentException("Dich vu khong ton tai");
             }
             serviceRequest.setService(service);
-            serviceRequest.setTotalPrice(service.getPrice().multiply(BigDecimal.valueOf(serviceRequest.getQuantity())));
+            serviceRequest.setTotalPrice(price.multiply(BigDecimal.valueOf(serviceRequest.getQuantity())));
         } else if (packagesId != null) {
             TimePackage timePackage = packageRepository.findById(packagesId).orElse(null);
             if (timePackage == null) {
-                throw new IllegalArgumentException("Gói giờ không tồn tại");
+                throw new IllegalArgumentException("Goi gio khong ton tai");
             }
             serviceRequest.setTimePackage(timePackage);
-            serviceRequest.setTotalPrice(timePackage.getPrice().multiply(BigDecimal.valueOf(serviceRequest.getQuantity())));
+            serviceRequest.setTotalPrice(price.multiply(BigDecimal.valueOf(serviceRequest.getQuantity())));
         } else {
-            throw new IllegalArgumentException("Cần chọn dịch vụ hoặc gói giờ");
+            throw new IllegalArgumentException("Can chon dich vu hoac goi gio");
         }
 
         return toMap(requestRepository.save(serviceRequest));
@@ -173,7 +180,7 @@ public class ServiceRequestService {
 
         ServiceRequest request = maybeRequest.get();
         if (request.getStatus() != ServiceRequest.RequestStatus.PENDING) {
-            throw new IllegalArgumentException("Yêu cầu phải ở trạng thái PENDING");
+            throw new IllegalArgumentException("Yeu cau phai o trang thai PENDING");
         }
 
         request.setStatus(ServiceRequest.RequestStatus.APPROVED);
