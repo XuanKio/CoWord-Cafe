@@ -43,7 +43,7 @@ public class CustomerService {
     @Transactional
     public Map<String, Object> create(String name, String phone, String password) {
         if (customerRepository.existsByPhone(phone)) {
-            throw new IllegalArgumentException("Số điện thoại đã tồn tại");
+            throw new IllegalArgumentException("Số điện thoại tồn tại");
         }
 
         Customer customer = new Customer();
